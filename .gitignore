@@ -1,0 +1,23 @@
+node_modules/
+dist/
+build/
+
+# Local environment — never commit real credentials or connection strings
+.env
+.env.local
+.env.*.local
+server/.env
+
+# Logs
+*.log
+api.log
+npm-debug.log*
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# mongodb-memory-server downloads its binary here
+.cache/
