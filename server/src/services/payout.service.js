@@ -4,6 +4,7 @@ import { ApiError } from '../utils/ApiError.js';
 import { txnRef } from '../utils/ids.js';
 import { notifyPayout } from './notification.service.js';
 import { logger } from '../utils/logger.js';
+import { TZ, localDateKey, lastNDateKeys } from '../utils/datetime.js';
 
 const isoWeekLabel = (d) => {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -166,10 +167,16 @@ export async function releasePayout(payoutId, adminId) {
 }
 
 /** A member's own earnings view: this month, pending, and recent settlements. */
+const EARNINGS_WINDOW_DAYS = 14;
+
 export async function workerEarnings(workerId) {
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
+
+  const windowStart = new Date();
+  windowStart.setDate(windowStart.getDate() - (EARNINGS_WINDOW_DAYS - 1));
+  windowStart.setHours(0, 0, 0, 0);
 
   const [worker, thisMonth, recent, payouts] = await Promise.all([
     Worker.findById(workerId).lean(),
@@ -183,17 +190,26 @@ export async function workerEarnings(workerId) {
       },
       { $group: { _id: null, jobs: { $sum: 1 }, earned: { $sum: '$pricing.workerPayout' } } },
     ]),
+    // A fixed 14-day window, not the last 14 rows: a member who worked
+    // sporadically would otherwise get a "last 14 days" chart spanning months.
     Booking.aggregate([
-      { $match: { worker: workerId, status: BOOKING_STATUS.COMPLETED } },
+      {
+        $match: {
+          worker: workerId,
+          status: BOOKING_STATUS.COMPLETED,
+          'otp.completeVerifiedAt': { $gte: windowStart },
+        },
+      },
       {
         $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$otp.completeVerifiedAt' } },
+          _id: {
+            $dateToString: { format: '%Y-%m-%d', date: '$otp.completeVerifiedAt', timezone: TZ },
+          },
           jobs: { $sum: 1 },
           earned: { $sum: '$pricing.workerPayout' },
         },
       },
-      { $sort: { _id: -1 } },
-      { $limit: 14 },
+      { $sort: { _id: 1 } },
     ]),
     Payout.find({ worker: workerId }).sort({ 'period.to': -1 }).limit(6).lean(),
   ]);
@@ -202,10 +218,18 @@ export async function workerEarnings(workerId) {
 
   const month = thisMonth[0] || { jobs: 0, earned: 0 };
 
+  // Fill the gaps, so the chart has a bar for every day rather than only for
+  // days that happened to have work. A zero day is information.
+  const byDate = new Map(recent.map((r) => [r._id, r]));
+  const daily = lastNDateKeys(EARNINGS_WINDOW_DAYS).map((key) => {
+    const row = byDate.get(key);
+    return { date: key, jobs: row?.jobs ?? 0, earned: Math.round(row?.earned ?? 0) };
+  });
+
   // Daily incentive target, Rapido-style: hit N jobs, unlock a bonus.
+  // "Today" is the local day, so the target does not reset at 05:30 IST.
   const dailyTarget = 5;
-  const today = new Date().toISOString().slice(0, 10);
-  const todayRow = recent.find((r) => r._id === today);
+  const todayRow = byDate.get(localDateKey());
 
   return {
     lifetime: Math.round(worker.earnings.lifetime),
@@ -221,9 +245,7 @@ export async function workerEarnings(workerId) {
       bonusUnlocked: (todayRow?.jobs ?? 0) >= dailyTarget,
       bonusAmount: 150,
     },
-    daily: recent
-      .map((r) => ({ date: r._id, jobs: r.jobs, earned: Math.round(r.earned) }))
-      .reverse(),
+    daily,
     payouts,
   };
 }

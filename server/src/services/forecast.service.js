@@ -1,5 +1,16 @@
 import { Booking, Worker, Service } from '../models/index.js';
 import { BOOKING_STATUS } from '../config/constants.js';
+import { env } from '../config/env.js';
+import { localParts, lastNDateKeys } from '../utils/datetime.js';
+
+/**
+ * Every date-part extraction below passes an explicit timezone.
+ *
+ * Without it MongoDB buckets in UTC while the client reads the result in local
+ * time, and the two disagree by the UTC offset — enough to report the small
+ * hours as the busiest time of day on an IST deployment.
+ */
+const TZ = env.timezone;
 
 /**
  * Demand intelligence, computed with MongoDB aggregation over the booking
@@ -25,7 +36,7 @@ export async function hourlyProfile({ skillTag, zone, days = 30 }) {
         ...(zone ? { 'address.zone': zone } : {}),
       },
     },
-    { $group: { _id: { $hour: '$scheduledFor' }, count: { $sum: 1 } } },
+    { $group: { _id: { $hour: { date: '$scheduledFor', timezone: TZ } }, count: { $sum: 1 } } },
   ]);
 
   const byHour = new Map(rows.map((r) => [r._id, r.count]));
@@ -53,7 +64,12 @@ export async function weekdayProfile({ skillTag, days = 60 }) {
         ...(skillTag ? { skillTag } : {}),
       },
     },
-    { $group: { _id: { $dayOfWeek: '$scheduledFor' }, count: { $sum: 1 } } },
+    {
+      $group: {
+        _id: { $dayOfWeek: { date: '$scheduledFor', timezone: TZ } },
+        count: { $sum: 1 },
+      },
+    },
   ]);
 
   const byDay = new Map(rows.map((r) => [r._id - 1, r.count])); // $dayOfWeek is 1-indexed
@@ -89,14 +105,15 @@ export async function forecastDemand({ skillTag, zone, horizonHours = 24 }) {
   const points = [];
   for (let i = 1; i <= horizonHours; i += 1) {
     const at = new Date(Date.now() + i * 3600_000);
-    const hIdx = hourly[at.getHours()].index;
-    const dIdx = weekday[at.getDay()].index;
-    const expected = baselinePerHour * hIdx * dIdx;
+    // Read the hour and weekday in the same timezone the aggregation bucketed by.
+    const { hour, weekday: dow } = localParts(at);
+
+    const expected = baselinePerHour * hourly[hour].index * weekday[dow].index;
 
     points.push({
       at: at.toISOString(),
-      hour: at.getHours(),
-      label: `${String(at.getHours()).padStart(2, '0')}:00`,
+      hour,
+      label: `${String(hour).padStart(2, '0')}:00`,
       expectedBookings: Math.round(expected * 10) / 10,
       // Confidence decays across the horizon — say so rather than implying precision.
       confidence: Math.round(Math.max(0.35, 0.92 - i * 0.02) * 100),
@@ -199,7 +216,7 @@ export async function revenueTrend({ days = 14, cooperative } = {}) {
     },
     {
       $group: {
-        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt', timezone: TZ } },
         bookings: { $sum: 1 },
         gross: { $sum: '$pricing.total' },
         workerPayout: { $sum: '$pricing.workerPayout' },
@@ -212,8 +229,7 @@ export async function revenueTrend({ days = 14, cooperative } = {}) {
   // Fill gaps so the chart has a point for every day, not just active ones.
   const byDate = new Map(rows.map((r) => [r._id, r]));
   const out = [];
-  for (let i = days - 1; i >= 0; i -= 1) {
-    const d = new Date(Date.now() - i * 86400_000).toISOString().slice(0, 10);
+  for (const d of lastNDateKeys(days)) {
     const row = byDate.get(d);
     out.push({
       date: d,

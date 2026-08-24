@@ -37,6 +37,16 @@ export const env = {
   surgeMin: num(process.env.SURGE_MIN, 1.0),
   surgeMax: num(process.env.SURGE_MAX, 1.8),
 
+  /**
+   * Reporting timezone.
+   *
+   * Every date-bucketing aggregation must name this explicitly: MongoDB's
+   * $hour/$dayOfWeek/$dateToString default to UTC, so on an IST deployment an
+   * 18:00 booking buckets into hour 12 and the "busiest hour" comes out 5.5
+   * hours wrong. See forecast.service.js.
+   */
+  timezone: process.env.REPORT_TZ || 'Asia/Kolkata',
+
   seedOnBoot: process.env.SEED_ON_BOOT !== 'false',
 };
 
