@@ -12,6 +12,7 @@ import { listCooperatives, getCooperative } from '../controllers/notification.co
 import { validate } from '../middleware/validate.js';
 import { idParam } from '../validators/schemas.js';
 import { ok } from '../utils/respond.js';
+import { isEphemeral } from '../config/db.js';
 
 const router = Router();
 
@@ -23,6 +24,11 @@ router.get('/health', (_req, res) =>
     db: {
       state: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState],
       name: mongoose.connection.name,
+      // Host distinguishes a real cluster from the throwaway in-memory server,
+      // which a bare connection state cannot: both report "connected" to
+      // "shramsetu". No credentials appear here — only the resolved host.
+      host: mongoose.connection.host,
+      ephemeral: isEphemeral(),
     },
     time: new Date().toISOString(),
   }),
