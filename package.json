@@ -9,6 +9,7 @@
     "dev:api": "npm run dev --prefix server",
     "dev:web": "npm run dev --prefix client",
     "seed": "npm run seed --prefix server",
+    "smoke": "npm run smoke --prefix server",
     "build": "npm run build --prefix client",
     "start": "npm start --prefix server"
   },
