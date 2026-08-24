@@ -23,3 +23,8 @@ services:
       # Codes are written to the log stream until a provider is configured.
       - key: SMS_PROVIDER
         value: log
+      # One-shot cleanup for a deployment that was demo-seeded before it went
+      # live: set to "true", redeploy, then set it back. Refuses to touch a
+      # database without the demo seed's mark, and keeps the catalogue.
+      - key: PURGE_DEMO
+        value: "false"

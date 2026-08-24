@@ -9,6 +9,7 @@
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
     "seed": "node src/seed/seed.js",
+    "purge:demo": "node src/seed/purge.cli.js",
     "smoke": "node src/seed/smoke.js"
   },
   "dependencies": {

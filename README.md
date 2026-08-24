@@ -51,6 +51,22 @@ To populate a local database with fictional users, bookings and earnings, set
 `SEED_DEMO=true`. It only ever runs against an in-memory or empty database, and
 `assertProductionConfig()` refuses to start production with it on.
 
+### Clearing demo data out of a real deployment
+
+A deployment that was demo-seeded before it went live still holds those invented
+accounts, with passwords that are written down in the git history. Two ways to
+remove them, both keeping the service catalogue and both idempotent:
+
+```bash
+npm run purge:demo --prefix server -- --yes
+```
+
+Or, when the database is firewalled to the hosting platform and a terminal
+cannot reach it, set `PURGE_DEMO=true` in the deployment's environment and
+redeploy. It runs once on boot and logs what it deleted — unset it afterwards so
+a real signup can never meet it. Either way the purge refuses to run against a
+database that does not carry the demo seed's mark.
+
 ### Verify it
 
 The suite needs the demo fixtures and an admin to test with, so start the server

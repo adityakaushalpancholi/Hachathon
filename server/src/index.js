@@ -2,6 +2,7 @@ import { createApp } from './app.js';
 import { connectDatabase, disconnectDatabase, isEphemeral } from './config/db.js';
 import { startScheduler, stopScheduler } from './services/scheduler.service.js';
 import { runSeed } from './seed/seed.js';
+import { purgeDemoData } from './seed/purge.js';
 import { User } from './models/index.js';
 import { env, assertProductionConfig } from './config/env.js';
 import { hasOwners } from './services/owner.service.js';
@@ -32,6 +33,15 @@ async function bootstrap() {
   if (await shouldSeedDemo()) {
     logger.warn('seeding demo data — fictional users, bookings and earnings');
     await runSeed({ quiet: true, demo: true });
+  }
+
+  // Runs after the seed so the two cannot fight over the same boot, and only
+  // against a database still carrying the demo mark — see purge.js.
+  if (env.purgeDemo) {
+    const { purged } = await purgeDemoData();
+    if (purged) {
+      logger.warn('PURGE_DEMO ran — unset it now so a real signup never meets it');
+    }
   }
 
   if (!hasOwners()) {

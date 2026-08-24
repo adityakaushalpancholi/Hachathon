@@ -108,6 +108,18 @@ export const env = {
    * database must never be populated with invented people and fake earnings.
    */
   seedDemo: bool(process.env.SEED_DEMO, false),
+
+  /**
+   * Delete seeded demo people on boot, keeping the catalogue.
+   *
+   * For the deployment that was demo-seeded once and now needs to be real. The
+   * alternative is reaching the database directly, which an operator often
+   * cannot do — managed clusters are firewalled to the platform, so a
+   * redeployable switch is the only lever they actually have. Safe to leave on
+   * (the purge is idempotent and refuses a database without the demo mark), but
+   * turn it off once it has run so a real signup can never meet it.
+   */
+  purgeDemo: bool(process.env.PURGE_DEMO, false),
 };
 
 export const isProd = env.nodeEnv === 'production';
