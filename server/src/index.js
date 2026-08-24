@@ -2,16 +2,30 @@ import { createApp } from './app.js';
 import { connectDatabase, disconnectDatabase, isEphemeral } from './config/db.js';
 import { startScheduler, stopScheduler } from './services/scheduler.service.js';
 import { runSeed } from './seed/seed.js';
+import { User } from './models/index.js';
 import { env } from './config/env.js';
 import { logger } from './utils/logger.js';
+
+/**
+ * Should this boot seed?
+ *
+ * An in-memory database starts empty every time, so it always needs seeding or
+ * the panels open onto a blank app. A persistent database is seeded only when
+ * it is still empty — a first deploy against a fresh Atlas cluster — because
+ * runSeed() clears every collection, and doing that on each restart would wipe
+ * real bookings.
+ */
+async function shouldSeed() {
+  if (!env.seedOnBoot) return false;
+  if (isEphemeral()) return true;
+  return (await User.estimatedDocumentCount()) === 0;
+}
 
 async function bootstrap() {
   await connectDatabase();
 
-  // An in-memory database starts empty every time, so seed it or the panels
-  // would open onto a blank app.
-  if (isEphemeral() && env.seedOnBoot) {
-    logger.info('seeding ephemeral database…');
+  if (await shouldSeed()) {
+    logger.info(`seeding ${isEphemeral() ? 'ephemeral' : 'empty persistent'} database…`);
     await runSeed({ quiet: true });
   }
 
