@@ -62,6 +62,21 @@ export function AuthProvider({ children }) {
     [applySession],
   );
 
+  /**
+   * Ask for a code. No session results — this only starts the exchange, and it
+   * deliberately returns the same shape whether or not the number is known.
+   */
+  const requestOtp = useCallback((phone) => authApi.requestOtp(phone), []);
+
+  const verifyOtp = useCallback(
+    async (payload) => {
+      const result = await authApi.verifyOtp(payload);
+      applySession(result);
+      return result;
+    },
+    [applySession],
+  );
+
   const register = useCallback(
     async (payload) => {
       const result = await authApi.register(payload);
@@ -84,15 +99,25 @@ export function AuthProvider({ children }) {
       role: session?.panel ?? null,
       workerProfile: session?.workerProfile ?? null,
       cooperative: session?.cooperative ?? null,
+      // The server's own description of the account — role, label, which sign-in
+      // methods work, whether the number is verified. The client renders this
+      // rather than deducing any of it from the user document.
+      account: session?.account ?? null,
       isAuthenticated: Boolean(session),
+      // Display hint only. The database panel is gated server-side against the
+      // deployment's owner list; this just avoids showing a door that opens
+      // onto a 403.
+      isOwner: Boolean(session?.account?.isOwner ?? session?.isOwner),
       loading,
       login,
+      requestOtp,
+      verifyOtp,
       register,
       logout,
       refresh,
       setSession,
     }),
-    [session, loading, login, register, logout, refresh],
+    [session, loading, login, requestOtp, verifyOtp, register, logout, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

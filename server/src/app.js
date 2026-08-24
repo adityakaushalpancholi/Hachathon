@@ -26,6 +26,18 @@ export function createApp() {
   app.use(morgan(isProd ? 'combined' : 'dev'));
 
   /**
+   * A loopback origin on any port — the shape of a local dev server.
+   *
+   * Vite's proxy is a server-to-server hop, so it forwards the browser's Origin
+   * header unchanged while `changeOrigin` rewrites only Host. That makes the
+   * same-origin test fail for every Vite port except the one someone remembered
+   * to list in CORS_ORIGIN, and the symptom is a CORS error on a request that
+   * never left the machine. Development accepts any loopback port; production
+   * does not use this at all.
+   */
+  const isLoopback = (origin) => /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+
+  /**
    * CORS guards the API only — never the static bundle.
    *
    * Vite stamps `crossorigin` onto its module scripts and stylesheet, which puts
@@ -40,7 +52,8 @@ export function createApp() {
     const allowed =
       !origin ||
       origin === `${req.protocol}://${req.get('host')}` ||
-      env.corsOrigin.includes(origin);
+      env.corsOrigin.includes(origin) ||
+      (!isProd && isLoopback(origin));
 
     cb(allowed ? null : new ApiError(403, `Origin ${origin} is not allowed by CORS`), {
       origin: allowed,

@@ -27,27 +27,47 @@ npm run dev
 - Web: <http://localhost:5173>
 - API: <http://localhost:4000/api/health>
 
-### Demo accounts
+### Signing in
 
-The seed is deterministic (fixed PRNG), so these are stable across restarts.
+Sign-in is by one-time code: enter a mobile number, enter the code, and the
+account is created on first use. Locally there is no SMS provider, so the code is
+written to the server log — or returned in the response body if you set
+`OTP_ECHO=true`, which production refuses to boot with.
 
-| Panel | Phone | Password | Who |
-|---|---|---|---|
-| Customer | `9876543210` | `customer123` | Aditya Rao, Bandra West |
-| Member | `9000000001` | `worker123` | Ramesh Patil, electrician |
-| Board | `9876500001` | `admin123` | Anjali Deshpande, Mumbai Kaamgaar Sahakari Sanstha |
+Your role follows from configuration, not from anything in the database:
 
-The login screen has a one-click button for each.
+| Panel | How an account gets it |
+|---|---|
+| Customer | The default for any new number |
+| Member | Register with `role: "worker"`; the board then verifies the profile |
+| Board | The number appears in `OWNER_PHONES` |
+
+`OWNER_PHONES` is a comma-separated list read from the environment on every
+request. An `admin` row written directly into the database does not grant the
+role — it is reconciled back down to `customer` at the next sign-in. There is no
+endpoint anywhere that promotes an account.
+
+To populate a local database with fictional users, bookings and earnings, set
+`SEED_DEMO=true`. It only ever runs against an in-memory or empty database, and
+`assertProductionConfig()` refuses to start production with it on.
 
 ### Verify it
+
+The suite needs the demo fixtures and an admin to test with, so start the server
+with both, then run it:
+
+```bash
+SEED_DEMO=true OWNER_PHONES=9876500001 OTP_ECHO=true npm run dev --prefix server
+```
 
 ```bash
 npm run smoke --prefix server
 ```
 
-78 end-to-end checks against the running API: the full customer → dispatch →
-worker → OTP → completion → review → settlement path, plus the role boundaries
-between the three panels.
+End-to-end checks against the running API: the full customer → dispatch → worker
+→ job code → completion → review → settlement path, the one-time code sign-in,
+the role boundaries between the three panels, and the owner-only database panel
+including its redaction and allowlist guarantees.
 
 ### Point it at a real MongoDB
 

@@ -1,12 +1,16 @@
 import {
   LayoutDashboard, CalendarCheck, MapPin, PlusCircle,
   Inbox, Wrench, Wallet,
-  ShieldCheck, Activity, Banknote, TrendingUp,
+  ShieldCheck, Activity, Banknote, TrendingUp, Database,
 } from 'lucide-react';
 
 /**
  * Panel navigation. Each panel's routes are declared once here and consumed by
  * both the sidebar and the mobile tab bar, so they can never drift apart.
+ *
+ * An entry marked `ownerOnly` is hidden from admins who are not on the
+ * deployment's owner list. That is presentation, not protection — the route
+ * behind it is refused server-side either way.
  */
 
 export const CUSTOMER_NAV = [
@@ -28,6 +32,7 @@ export const ADMIN_NAV = [
   { to: '/admin/operations', label: 'Operations', icon: Activity },
   { to: '/admin/settlement', label: 'Settlement', icon: Banknote },
   { to: '/admin/insights', label: 'Insights', icon: TrendingUp },
+  { to: '/admin/database', label: 'Database', icon: Database, ownerOnly: true },
 ];
 
 export const PANEL_META = {

@@ -43,7 +43,10 @@ const userSchema = new mongoose.Schema(
       match: [/^[6-9]\d{9}$/, 'phone must be a 10-digit Indian mobile number'],
     },
     email: { type: String, lowercase: true, trim: true, sparse: true },
-    passwordHash: { type: String, required: true, select: false },
+    // Optional: accounts created through the OTP flow never set one, and a
+    // verified phone is the credential. Present only for password sign-in.
+    passwordHash: { type: String, select: false },
+    phoneVerifiedAt: { type: Date },
     role: { type: String, enum: Object.values(ROLES), default: ROLES.CUSTOMER, index: true },
     avatar: { type: String },
     language: { type: String, enum: LANGUAGES, default: 'en' },
@@ -77,7 +80,13 @@ userSchema.methods.setPassword = async function (plain) {
   this.passwordHash = await bcrypt.hash(plain, 10);
 };
 
-userSchema.methods.verifyPassword = function (plain) {
+userSchema.methods.verifyPassword = async function (plain) {
+  // An OTP-only account has no hash. Compare against a dummy anyway so the
+  // response time does not reveal which numbers have passwords set.
+  if (!this.passwordHash) {
+    await bcrypt.compare(plain, '$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidin');
+    return false;
+  }
   return bcrypt.compare(plain, this.passwordHash);
 };
 

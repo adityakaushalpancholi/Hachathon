@@ -173,8 +173,8 @@ export default function Landing() {
               </div>
 
               <p className="mt-6 border-t border-navy-100 pt-4 text-xs leading-relaxed text-navy-500">
-                Figures from this prototype&rsquo;s live pricing engine. Every booking screen shows
-                the same split before you confirm.
+                Figures come from the live pricing engine. Every booking screen shows the same
+                split before you confirm.
               </p>
             </div>
           </div>

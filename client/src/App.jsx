@@ -35,6 +35,7 @@ const Verification = lazy(() => import('./panels/admin/Verification.jsx'));
 const Operations = lazy(() => import('./panels/admin/Operations.jsx'));
 const Settlement = lazy(() => import('./panels/admin/Settlement.jsx'));
 const Insights = lazy(() => import('./panels/admin/Insights.jsx'));
+const DatabasePanel = lazy(() => import('./panels/admin/DatabasePanel.jsx'));
 
 const PageLoader = () => (
   <div className="flex min-h-[50vh] items-center justify-center text-navy-400">
@@ -101,6 +102,9 @@ export default function App() {
           <Route path="operations" element={<Operations />} />
           <Route path="settlement" element={<Settlement />} />
           <Route path="insights" element={<Insights />} />
+          {/* Owner-only in practice: every /api/database route is refused for an
+              admin who is not on the deployment's owner list. */}
+          <Route path="database" element={<DatabasePanel />} />
         </Route>
 
         <Route path="/dashboard" element={<Navigate to="/app" replace />} />

@@ -16,3 +16,10 @@ services:
         sync: false
       - key: SEED_ON_BOOT
         value: "true"
+      # Set to your own mobile number. Without it nobody can hold the admin
+      # role — the deliberate fail-closed default.
+      - key: OWNER_PHONES
+        sync: false
+      # Codes are written to the log stream until a provider is configured.
+      - key: SMS_PROVIDER
+        value: log

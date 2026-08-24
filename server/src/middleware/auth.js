@@ -3,6 +3,7 @@ import { env } from '../config/env.js';
 import { ApiError, asyncHandler } from '../utils/ApiError.js';
 import { User, Worker } from '../models/index.js';
 import { ROLES } from '../config/constants.js';
+import { isOwnerPhone } from '../services/owner.service.js';
 
 export const signToken = (user) =>
   jwt.sign({ sub: String(user._id), role: user.role }, env.jwtSecret, {
@@ -29,6 +30,18 @@ export const requireAuth = asyncHandler(async (req, _res, next) => {
 
   const user = await User.findById(payload.sub);
   if (!user || !user.isActive) throw ApiError.unauthorized('Account not found or deactivated');
+
+  /**
+   * Re-derive admin authority from the environment on every request.
+   *
+   * The token's role claim and the stored role field are both just data — one
+   * signed by us, one sitting in Mongo. Neither is evidence of entitlement. An
+   * admin account whose number has left OWNER_PHONES, or that was written
+   * straight into the database, is refused here regardless of what it carries.
+   */
+  if (user.role === ROLES.ADMIN && !isOwnerPhone(user.phone)) {
+    throw ApiError.forbidden('This account is no longer authorised for administration');
+  }
 
   req.user = user;
 
@@ -66,6 +79,20 @@ export const requireRole =
     }
     next();
   };
+
+/**
+ * The narrowest gate in the app: the operator themselves.
+ *
+ * Used for surfaces where a compromised admin session would be worse than a
+ * compromised customer one — raw database access, in particular.
+ */
+export const requireOwner = (req, _res, next) => {
+  if (!req.user) return next(ApiError.unauthorized());
+  if (!isOwnerPhone(req.user.phone)) {
+    return next(ApiError.forbidden('This area is restricted to the platform owner'));
+  }
+  next();
+};
 
 /** Worker routes additionally need a provisioned profile. */
 export const requireWorkerProfile = (req, _res, next) => {

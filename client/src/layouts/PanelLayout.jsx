@@ -19,11 +19,15 @@ import { PANEL_META } from '../lib/nav.jsx';
 export default function PanelLayout({ nav, panel }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const { user, cooperative, workerProfile, logout } = useAuth();
+  const { user, account, cooperative, workerProfile, isOwner, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const meta = PANEL_META[panel];
+  // The server names the panel; PANEL_META is only the fallback for a session
+  // rehydrated before the API answered.
+  const panelTitle = account?.label ?? meta.title;
+  const items = nav.filter((item) => !item.ownerOnly || isOwner);
   const accentBar = {
     customer: 'bg-navy-900',
     worker: 'bg-coop-600',
@@ -37,7 +41,7 @@ export default function PanelLayout({ nav, panel }) {
 
   const navItems = (
     <nav className="space-y-1">
-      {nav.map((item) => (
+      {items.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
@@ -81,7 +85,7 @@ export default function PanelLayout({ nav, panel }) {
 
           <div className="px-3">
             <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-wider text-navy-400">
-              {meta.title} panel
+              {panelTitle} panel
             </p>
             {navItems}
           </div>
@@ -115,7 +119,8 @@ export default function PanelLayout({ nav, panel }) {
                   Welcome back, {user?.name?.split(' ')[0]}
                 </p>
                 <p className="truncate text-xs text-navy-500">
-                  {meta.title} panel · signed in as {user?.phone}
+                  {panelTitle} panel · signed in as {user?.phone}
+                  {account?.isOwner && ' · platform owner'}
                 </p>
               </div>
 
@@ -193,7 +198,7 @@ export default function PanelLayout({ nav, panel }) {
       {/* ------------------- mobile bottom tab bar ----------------------- */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-navy-100 bg-white/95 backdrop-blur lg:hidden">
         <div className="flex">
-          {nav.slice(0, 4).map((item) => (
+          {items.slice(0, 4).map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

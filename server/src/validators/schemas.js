@@ -55,6 +55,15 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'password is required'),
 });
 
+export const otpRequestSchema = z.object({ phone });
+
+export const otpVerifySchema = z.object({
+  phone,
+  code: z.string().regex(/^\d{4,8}$/, 'code must be the digits sent to your phone'),
+  // Consulted only when the code registers a brand-new number.
+  name: z.string().min(2).max(80).optional(),
+});
+
 export const updateProfileSchema = z.object({
   name: z.string().min(2).max(80).optional(),
   email: z.string().email().optional(),

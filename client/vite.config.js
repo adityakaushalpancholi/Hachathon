@@ -10,7 +10,8 @@ export default defineConfig({
     // baked into the bundle.
     proxy: {
       '/api': {
-        target: 'http://localhost:4000',
+        // Override with API_PROXY when the server is on another port.
+        target: process.env.API_PROXY || 'http://localhost:4000',
         changeOrigin: true,
       },
     },

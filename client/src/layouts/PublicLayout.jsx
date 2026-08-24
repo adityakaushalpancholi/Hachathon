@@ -1,18 +1,23 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useState } from 'react';
-import { Menu, X, ArrowRight } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import Logo from '../components/Logo.jsx';
-import { useAuth, HOME_FOR_ROLE } from '../context/AuthContext.jsx';
 
 const LINKS = [
   { to: '/browse', label: 'Services' },
   { to: '/browse?view=members', label: 'Our members' },
 ];
 
+/**
+ * Public chrome.
+ *
+ * The header shows only Sign in and Sign up — never who is signed in. The public
+ * site is the front of the shop and says nothing about its visitors; identity
+ * belongs to the panels behind the login. Someone already holding a session is
+ * not stranded by this: /login redirects straight to their panel.
+ */
 export default function PublicLayout() {
   const [open, setOpen] = useState(false);
-  const { isAuthenticated, role, user } = useAuth();
-  const panelHref = HOME_FOR_ROLE[role] ?? '/app';
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
@@ -37,20 +42,12 @@ export default function PublicLayout() {
           </nav>
 
           <div className="ml-auto hidden items-center gap-2 md:flex">
-            {isAuthenticated ? (
-              <Link to={panelHref} className="btn-primary">
-                {user?.name?.split(' ')[0]}&rsquo;s panel <ArrowRight size={15} />
-              </Link>
-            ) : (
-              <>
-                <Link to="/login" className="btn-ghost">
-                  Sign in
-                </Link>
-                <Link to="/register" className="btn-primary">
-                  Get started
-                </Link>
-              </>
-            )}
+            <Link to="/login" className="btn-ghost">
+              Sign in
+            </Link>
+            <Link to="/register" className="btn-primary">
+              Sign up
+            </Link>
           </div>
 
           <button
@@ -75,20 +72,12 @@ export default function PublicLayout() {
               </Link>
             ))}
             <div className="mt-3 flex gap-2 border-t border-navy-100 pt-3">
-              {isAuthenticated ? (
-                <Link to={panelHref} className="btn-primary flex-1">
-                  Go to my panel
-                </Link>
-              ) : (
-                <>
-                  <Link to="/login" className="btn-outline flex-1">
-                    Sign in
-                  </Link>
-                  <Link to="/register" className="btn-primary flex-1">
-                    Get started
-                  </Link>
-                </>
-              )}
+              <Link to="/login" onClick={() => setOpen(false)} className="btn-outline flex-1">
+                Sign in
+              </Link>
+              <Link to="/register" onClick={() => setOpen(false)} className="btn-primary flex-1">
+                Sign up
+              </Link>
             </div>
           </div>
         )}
@@ -135,7 +124,7 @@ export default function PublicLayout() {
         </div>
 
         <div className="border-t border-navy-800 px-4 py-5 text-center text-xs text-navy-400 sm:px-6">
-          Built as a cooperative-ownership prototype. Demo data only.
+          &copy; {new Date().getFullYear()} ShramSetu · owned and governed by its members.
         </div>
       </footer>
     </div>

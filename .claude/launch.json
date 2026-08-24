@@ -2,16 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "shramsetu-web",
+      "name": "client",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--prefix", "client"],
       "port": 5173
-    },
-    {
-      "name": "shramsetu-api",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "server"],
-      "port": 4000
     }
   ]
 }

@@ -73,29 +73,60 @@ const weightedHour = () => {
 
 /* --------------------------------- seed ---------------------------------- */
 
-export async function runSeed({ quiet = false } = {}) {
+/**
+ * Populate the database.
+ *
+ * Two quite different jobs share this function, separated by `demo`:
+ *
+ *   demo: false — the catalogue a real launch needs, and nothing else. The
+ *                 cooperatives and the bookable services are reference data,
+ *                 not fiction, so a live deployment wants exactly this.
+ *
+ *   demo: true  — additionally invents members, customers, bookings, reviews
+ *                 and payouts so every screen has something on it. Destructive:
+ *                 it clears the collections first, so it must never touch a
+ *                 database holding real bookings.
+ *
+ * The catalogue path is non-destructive and idempotent — it only inserts what
+ * is missing — which is what lets it run safely on each boot.
+ */
+export async function runSeed({ quiet = false, demo = false } = {}) {
   const log = quiet ? () => {} : (...a) => logger.info(...a);
 
-  await Promise.all([
-    User.deleteMany({}),
-    Cooperative.deleteMany({}),
-    Service.deleteMany({}),
-    Worker.deleteMany({}),
-    Booking.deleteMany({}),
-    Review.deleteMany({}),
-    Notification.deleteMany({}),
-    Payout.deleteMany({}),
-  ]);
-  log('cleared existing collections');
+  if (demo) {
+    await Promise.all([
+      User.deleteMany({}),
+      Cooperative.deleteMany({}),
+      Service.deleteMany({}),
+      Worker.deleteMany({}),
+      Booking.deleteMany({}),
+      Review.deleteMany({}),
+      Notification.deleteMany({}),
+      Payout.deleteMany({}),
+    ]);
+    log('cleared existing collections');
+  }
 
   /* 1 - cooperatives ------------------------------------------------------ */
-  const coops = await Cooperative.create(COOPERATIVES);
-  log(`created ${coops.length} cooperatives`);
+  const coops = (await Cooperative.countDocuments())
+    ? await Cooperative.find()
+    : await Cooperative.create(COOPERATIVES);
+  log(`${coops.length} cooperatives`);
 
   /* 2 - service catalogue ------------------------------------------------- */
-  const services = await Service.create(SERVICES);
+  const services = (await Service.countDocuments())
+    ? await Service.find()
+    : await Service.create(SERVICES);
   const serviceBySkill = new Map(services.map((s) => [s.skillTag, s]));
-  log(`created ${services.length} services`);
+  log(`${services.length} services`);
+
+  if (!demo) {
+    if (!quiet) logger.success('catalogue ready');
+    return {
+      summary: { cooperatives: coops.length, services: services.length },
+      credentials: null,
+    };
+  }
 
   /* 3 - one admin per cooperative board ----------------------------------- */
   const admins = [];
@@ -262,7 +293,7 @@ export async function runSeed({ quiet = false } = {}) {
 
   /* 5 - customers --------------------------------------------------------- */
   const customerNames = [
-    'Aditya Rao', 'Meera Iyer', 'Sameer Kulkarni', 'Divya Nair', 'Rohan Mehta',
+    'Kavya Menon', 'Meera Iyer', 'Sameer Kulkarni', 'Divya Nair', 'Rohan Mehta',
     'Farah Khan', 'Karthik Subramanian', 'Nisha Agarwal', 'Tanvi Joshi',
     'Arjun Bhatt', 'Shalini Verma', 'Imtiaz Ali',
   ];

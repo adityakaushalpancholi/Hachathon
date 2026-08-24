@@ -2,10 +2,14 @@
  * End-to-end smoke test against a running API.
  *
  * Walks the whole customer → dispatch → worker → completion → review → admin
- * path and asserts on each response. Run with the server up:
+ * path and asserts on each response. The server must be up, and must have been
+ * started with the demo fixtures and with the seeded board account nominated as
+ * an owner — otherwise there is no admin to test with, by design:
  *
+ *   SEED_DEMO=true OWNER_PHONES=9876500001 OTP_ECHO=true node src/index.js
  *   node src/seed/smoke.js
  */
+const OWNER_PHONE = process.env.SMOKE_OWNER_PHONE || '9876500001';
 const BASE = process.env.API || 'http://localhost:4000/api';
 
 let pass = 0;
@@ -71,10 +75,123 @@ async function main() {
   check('token resolves the customer panel', customer.data?.panel === 'customer', customer.data?.panel);
   const custToken = customer.data.token;
 
-  const admin = await api('POST', '/auth/login', { body: { phone: '9876500001', password: 'admin123' } });
+  check(
+    'the API describes the account it just issued',
+    customer.data?.account?.role === 'customer' &&
+      Array.isArray(customer.data?.account?.signInMethods) &&
+      customer.data.account.signInMethods.includes('password'),
+    customer.data?.account,
+  );
+
+  const admin = await api('POST', '/auth/login', { body: { phone: OWNER_PHONE, password: 'admin123' } });
   check('admin login succeeds', admin.status === 200 && !!admin.data?.token, admin);
   check('token resolves the admin panel', admin.data?.panel === 'admin', admin.data?.panel);
+  check('the admin is flagged as the platform owner', admin.data?.account?.isOwner === true, admin.data?.account);
   const adminToken = admin.data.token;
+
+  /* --------------------------- one-time codes -------------------------- */
+  section('One-time code sign-in');
+
+  const newPhone = `98${String(Date.now()).slice(-8)}`;
+
+  const req1 = await api('POST', '/auth/otp/request', { body: { phone: newPhone } });
+  check('OTP request accepted', req1.status === 200 && req1.data?.sent === true, req1);
+  check('OTP echo is on (server needs OTP_ECHO=true)', typeof req1.data?.devCode === 'string', req1.data);
+
+  /* Both numbers must be asking for their first code — the resend cooldown is a
+     rate limit, not a disclosure, and comparing a number that already has a live
+     code against a fresh one would measure the wrong thing. So the registered
+     side is created here, through the password route, which never issues one. */
+  const knownPhone = `97${String(Date.now()).slice(-8)}`;
+  const freshPhone = `96${String(Date.now()).slice(-8)}`;
+
+  await api('POST', '/auth/register', {
+    body: { name: 'Smoke Known Account', phone: knownPhone, password: 'smoke-pass-123', role: 'customer' },
+  });
+
+  const knownReq = await api('POST', '/auth/otp/request', { body: { phone: knownPhone } });
+  const freshReq = await api('POST', '/auth/otp/request', { body: { phone: freshPhone } });
+
+  const shape = (r) => JSON.stringify(Object.keys(r.data ?? {}).sort());
+  check(
+    'the response does not reveal whether a number is registered',
+    knownReq.status === freshReq.status &&
+      knownReq.data?.sent === freshReq.data?.sent &&
+      shape(knownReq) === shape(freshReq),
+    { known: { status: knownReq.status, keys: shape(knownReq) }, fresh: { status: freshReq.status, keys: shape(freshReq) } },
+  );
+
+  const wrongCode = await api('POST', '/auth/otp/verify', {
+    body: { phone: newPhone, code: req1.data.devCode === '000000' ? '111111' : '000000' },
+  });
+  check('a wrong code is rejected with 401', wrongCode.status === 401, wrongCode);
+
+  const otpNew = await api('POST', '/auth/otp/verify', {
+    body: { phone: newPhone, code: req1.data.devCode, name: 'Smoke Test Account' },
+  });
+  check('correct code signs in', !!otpNew.data?.token, otpNew);
+  check('an unknown number creates its account', otpNew.data?.isNew === true, otpNew.data);
+  check('a new account lands on the customer panel', otpNew.data?.panel === 'customer', otpNew.data?.panel);
+  check('the number is recorded as verified', otpNew.data?.account?.phoneVerified === true, otpNew.data?.account);
+  check(
+    'an OTP-only account is not offered a password',
+    otpNew.data?.account?.hasPassword === false &&
+      !otpNew.data.account.signInMethods.includes('password'),
+    otpNew.data?.account,
+  );
+
+  const replay = await api('POST', '/auth/otp/verify', {
+    body: { phone: newPhone, code: req1.data.devCode },
+  });
+  check('a consumed code cannot be replayed', replay.status === 401, replay);
+
+  /* ------------------------- administration is not grantable ------------ */
+  section('Administration is rooted in configuration');
+
+  const ownerOtp = await api('POST', '/auth/otp/request', { body: { phone: OWNER_PHONE } });
+  const ownerSession = await api('POST', '/auth/otp/verify', {
+    body: { phone: OWNER_PHONE, code: ownerOtp.data.devCode },
+  });
+  check('an owner number signs in as admin without any grant', ownerSession.data?.panel === 'admin', ownerSession.data?.panel);
+
+  check(
+    'no endpoint offers to promote an account',
+    (await api('POST', '/admin/users/promote', { token: adminToken, body: { role: 'admin' } })).status === 404,
+  );
+
+  const otpToken = otpNew.data.token;
+  const nonOwnerToDb = await api('GET', '/database', { token: otpToken });
+  check('a customer is refused the database panel (403)', nonOwnerToDb.status === 403, nonOwnerToDb);
+  check('the database panel refuses anonymous callers (401)', (await api('GET', '/database')).status === 401);
+
+  /* ---------------------------- database panel ------------------------- */
+  section('Database panel (owner only)');
+
+  const ownerToken = ownerSession.data.token;
+
+  const dbOverview = await api('GET', '/database', { token: ownerToken });
+  check('owner reads the collection overview', dbOverview.status === 200, dbOverview);
+  check('every collection reports a count', dbOverview.data?.collections?.every((c2) => typeof c2.count === 'number'), dbOverview.data?.collections);
+
+  const users = await api('GET', '/database/User?limit=5', { token: ownerToken });
+  check('owner reads a page of documents', users.data?.documents?.length > 0, users);
+  check('password hashes never leave the server', !JSON.stringify(users).includes('passwordHash'), 'passwordHash present');
+
+  const codes = await api('GET', '/database/Otp?limit=5', { token: ownerToken });
+  check('code hashes never leave the server', !JSON.stringify(codes).includes('codeHash'), 'codeHash present');
+
+  const escaped = await api('GET', '/database/User?q=.%2A', { token: ownerToken });
+  check('a search term is escaped, not run as a pattern', escaped.data?.total === 0, escaped.data?.total);
+
+  const systemColl = await api('GET', '/database/system.users', { token: ownerToken });
+  check('collections outside the allowlist are unreachable (404)', systemColl.status === 404, systemColl);
+
+  const cfg = await api('GET', '/database/config', { token: ownerToken });
+  check('config summary reduces secrets to booleans', typeof cfg.data?.secretsPresent?.jwtSecret === 'boolean', cfg.data);
+  check('config summary contains no secret values', !JSON.stringify(cfg).includes('mongodb+srv'), cfg.data);
+
+  const selfDelete = await api('DELETE', `/database/User/${ownerSession.data.user._id}`, { token: ownerToken });
+  check('the panel refuses to delete the account using it', selfDelete.status === 400, selfDelete);
 
   /* --------------------- role boundaries between panels ---------------- */
   section('Panel access boundaries');

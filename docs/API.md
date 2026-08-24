@@ -39,6 +39,8 @@ panel and is re-checked on every panel-scoped route.
 |---|---|---|---|
 | POST | `/auth/register` | public | Create a customer or member account |
 | POST | `/auth/login` | public | Exchange phone + password for a token |
+| POST | `/auth/otp/request` | public | Send a one-time code to a number |
+| POST | `/auth/otp/verify` | public | Exchange phone + code for a token |
 | GET | `/auth/me` | auth | Rehydrate the session; returns `panel` |
 | PATCH | `/auth/me` | auth | Update name, email, language |
 | POST | `/auth/addresses` | auth | Add a service address |
@@ -63,13 +65,90 @@ failures.
   "data": {
     "token": "eyJhbGciOi...",
     "panel": "customer",          // which panel the client may mount
-    "user": { "_id": "...", "name": "Aditya Rao", "role": "customer", "addresses": [...] },
+    "user": { "_id": "...", "name": "Priya Sharma", "role": "customer", "addresses": [...] },
+    "account": {                  // what this account is, stated by the server
+      "role": "customer",
+      "label": "Customer",
+      "isOwner": false,
+      "phoneVerified": true,
+      "hasPassword": true,
+      "signInMethods": ["otp", "password"],
+      "membershipId": null,
+      "memberSince": "2026-01-14T09:22:10.441Z",
+      "lastLoginAt": "2026-08-25T04:11:02.910Z"
+    },
+    "isOwner": false,
     "workerProfile": null,        // populated for role=worker
     "cooperative": null           // populated when the user belongs to one
   }
 }
 ```
+
+`account` is the server's own description of the caller. The client renders it
+rather than deducing any of it — `signInMethods`, in particular, is why the sign-in
+screen never offers a password box to an account that has no password.
 </details>
+
+<details>
+<summary><code>POST /auth/otp/request</code> → <code>POST /auth/otp/verify</code></summary>
+
+```json
+{ "phone": "9812345678" }
+```
+
+```jsonc
+{
+  "success": true,
+  "data": {
+    "sent": true,
+    "phone": "9812345678",
+    "expiresInSec": 300,
+    "channel": "log",          // "log" until SMS_PROVIDER is configured
+    "devCode": "418205"        // only when OTP_ECHO=true, which prod refuses
+  }
+}
+```
+
+The response is **identical whether or not the number has an account**. That is
+deliberate: an endpoint that answers differently is a directory of who is
+registered.
+
+```json
+{ "phone": "9812345678", "code": "418205", "name": "Priya Sharma" }
+```
+
+Returns the same session shape as `/auth/login`, plus `isNew`. `name` is only
+used when the number has no account yet — verifying an unknown number creates
+one, which is why there is no separate registration step for customers.
+
+Codes are stored as SHA-256 hashes, compared in constant time, expire via a TTL
+index, allow `OTP_MAX_ATTEMPTS` guesses before the code is burned, and are
+limited to 8 requests per hour **per phone number** rather than per IP — the
+number being targeted is what needs protecting, not the caller's address.
+</details>
+
+---
+
+## Database (owner)
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| GET | `/database` | owner | Collection list with counts, connection, storage |
+| GET | `/database/config` | owner | Runtime configuration; secrets as booleans |
+| GET | `/database/:collection` | owner | A page of documents. `?page&limit&sort&q` |
+| GET | `/database/:collection/indexes` | owner | Index definitions |
+| GET | `/database/:collection/:id` | owner | One document |
+| DELETE | `/database/:collection/:id` | owner | Delete one document |
+
+"Owner" is stricter than `role: admin` — the caller's number must be in
+`OWNER_PHONES`. An admin who runs a cooperative gets 403 here.
+
+Collections are addressed through an allowlist of registered models, never by the
+raw URL string, so this cannot be walked sideways into `system.*`. `passwordHash`
+and `codeHash` are stripped from every response at any nesting depth. `q` is
+regex-escaped before it becomes a pattern. Delete is the only write offered:
+editing arbitrary fields from a grid would route around every validator and hook
+the models define.
 
 ---
 

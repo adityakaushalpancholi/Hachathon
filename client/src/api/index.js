@@ -13,6 +13,13 @@ import { http } from './client.js';
 export const auth = {
   register: (payload) => http.post('/auth/register', payload, { auth: false }),
   login: (phone, password) => http.post('/auth/login', { phone, password }, { auth: false }),
+
+  // One-time codes. `requestOtp` answers identically whether or not the number
+  // has an account, so nothing here reveals who is registered; `verifyOtp`
+  // creates the account on first use, which is why `name` is accepted.
+  requestOtp: (phone) => http.post('/auth/otp/request', { phone }, { auth: false }),
+  verifyOtp: (payload) => http.post('/auth/otp/verify', payload, { auth: false }),
+
   me: () => http.get('/auth/me'),
   updateProfile: (payload) => http.patch('/auth/me', payload),
   addAddress: (payload) => http.post('/auth/addresses', payload),
@@ -117,6 +124,20 @@ export const admin = {
   workforce: () => http.get('/admin/workforce'),
   heatmap: (params) => http.get('/admin/heatmap', { params }),
   flaggedReviews: () => http.get('/admin/reviews/flagged'),
+};
+
+/* ----------------------------- DATABASE panel ----------------------------- */
+/* Owner-only. Every route here is refused with 403 for an admin who is not on
+   the deployment's OWNER_PHONES list, so the UI gate is a convenience, not the
+   control.                                                                    */
+
+export const database = {
+  overview: () => http.get('/database'),
+  config: () => http.get('/database/config'),
+  list: (collection, params) => http.get(`/database/${collection}`, { params }),
+  get: (collection, id) => http.get(`/database/${collection}/${id}`),
+  indexes: (collection) => http.get(`/database/${collection}/indexes`),
+  remove: (collection, id) => http.del(`/database/${collection}/${id}`),
 };
 
 export { ApiError, tokenStore, onUnauthorized } from './client.js';

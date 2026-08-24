@@ -5,6 +5,49 @@ import { signToken } from '../middleware/auth.js';
 import { ROLES, VERIFICATION_STATUS } from '../config/constants.js';
 import { membershipId } from '../utils/ids.js';
 import { toPoint } from '../utils/geo.js';
+import { issueOtp, verifyOtp } from '../services/otp.service.js';
+import { entitledRole, reconcileRole, isOwnerPhone } from '../services/owner.service.js';
+
+const PANEL_LABEL = {
+  [ROLES.CUSTOMER]: 'Customer',
+  [ROLES.WORKER]: 'Member',
+  [ROLES.ADMIN]: 'Cooperative Board',
+};
+
+/**
+ * What this account *is*, stated by the server.
+ *
+ * The client should never work out an account's nature by inspecting fields —
+ * whether it can use a password, whether its number is proven, what it is
+ * allowed to see. Those are all server facts, so the server says them outright
+ * and the client only renders the answer.
+ *
+ * `passwordHash` is `select: false`, so a document loaded by `requireAuth` does
+ * not carry it. Its absence is not evidence either way, hence the one-field
+ * lookup rather than a guess.
+ */
+const describeAccount = async (user) => {
+  const hasPassword =
+    user.passwordHash !== undefined
+      ? Boolean(user.passwordHash)
+      : Boolean(
+          (await User.findById(user._id).select('+passwordHash').lean())?.passwordHash,
+        );
+
+  return {
+    role: user.role,
+    label: PANEL_LABEL[user.role] ?? user.role,
+    isOwner: isOwnerPhone(user.phone),
+    phoneVerified: Boolean(user.phoneVerifiedAt),
+    hasPassword,
+    // Which doors this account can actually come through, so the sign-in screen
+    // never offers one that cannot work.
+    signInMethods: hasPassword ? ['otp', 'password'] : ['otp'],
+    membershipId: user.membershipId ?? null,
+    memberSince: user.createdAt ?? null,
+    lastLoginAt: user.lastLoginAt ?? null,
+  };
+};
 
 /**
  * The session token is the panel key: its `role` claim decides which of the
@@ -13,15 +56,28 @@ import { toPoint } from '../utils/geo.js';
  */
 const sessionPayload = async (user) => {
   const token = signToken(user);
-  const payload = { token, user: user.toSafeJSON(), panel: user.role };
+  const account = await describeAccount(user);
+
+  const payload = {
+    token,
+    user: user.toSafeJSON(),
+    panel: user.role,
+    // The full description of who is signed in. `isOwner` is repeated at the top
+    // level for the callers that only need that one bit; both are display hints,
+    // and every owner route re-checks server-side regardless.
+    account,
+    isOwner: account.isOwner,
+  };
 
   if (user.role === ROLES.WORKER) {
     payload.workerProfile = await Worker.findOne({ user: user._id })
       .populate('cooperative', 'name code city governance')
       .lean();
+    payload.account.verification = payload.workerProfile?.verification?.status ?? null;
   }
   if (user.cooperative) {
     payload.cooperative = await Cooperative.findById(user.cooperative).lean();
+    payload.account.cooperative = payload.cooperative?.name ?? null;
   }
   return payload;
 };
@@ -33,7 +89,10 @@ export const register = asyncHandler(async (req, res) => {
     throw ApiError.conflict('An account with this phone number already exists');
   }
 
+  // `role` is constrained to customer or worker by the schema; an owner number
+  // is upgraded here so the operator's own account works however it was made.
   const user = new User({ name, phone, email, role, language });
+  user.role = entitledRole(user);
   await user.setPassword(password);
 
   // A worker must belong to a cooperative — that is the whole premise, so we
@@ -96,10 +155,71 @@ export const login = asyncHandler(async (req, res) => {
   const valid = await user.verifyPassword(password);
   if (!valid) throw ApiError.unauthorized('Incorrect password');
 
+  await reconcileRole(user);
   user.lastLoginAt = new Date();
   await user.save();
 
   return ok(res, await sessionPayload(user));
+});
+
+/* ------------------------------- OTP sign-in ------------------------------ */
+
+/**
+ * Step one: send a code.
+ *
+ * The response is deliberately identical whether or not an account exists.
+ * Answering "no account found" here would turn this endpoint into a directory
+ * of which numbers are registered, so instead the client is told a code was
+ * sent and learns the account's status only after proving it holds the phone.
+ */
+export const requestOtp = asyncHandler(async (req, res) => {
+  const { phone } = req.body;
+
+  const result = await issueOtp({ phone, purpose: 'login', ip: req.ip });
+
+  return ok(res, {
+    sent: true,
+    phone,
+    expiresInSec: result.expiresInSec,
+    channel: result.channel,
+    ...(result.code ? { devCode: result.code } : {}),
+  });
+});
+
+/**
+ * Step two: exchange a correct code for a session.
+ *
+ * A first-time number is registered here rather than being turned away, which
+ * is what makes a phone number the whole of the sign-up flow. `name` is
+ * optional and only consulted when the account is actually new.
+ */
+export const verifyOtpLogin = asyncHandler(async (req, res) => {
+  const { phone, code, name } = req.body;
+
+  await verifyOtp({ phone, code, purpose: 'login' });
+
+  let user = await User.findOne({ phone });
+  let isNew = false;
+
+  if (!user) {
+    user = new User({
+      name: name?.trim() || `Member ${phone.slice(-4)}`,
+      phone,
+      role: ROLES.CUSTOMER,
+    });
+    isNew = true;
+  }
+
+  if (!user.isActive) throw ApiError.forbidden('This account has been deactivated');
+
+  // Owner numbers become admins here and nowhere else — see owner.service.js.
+  user.role = entitledRole(user);
+  user.phoneVerifiedAt = new Date();
+  user.lastLoginAt = new Date();
+  await user.save();
+
+  const payload = await sessionPayload(user);
+  return isNew ? created(res, { ...payload, isNew }) : ok(res, { ...payload, isNew });
 });
 
 /** Called on app boot to rehydrate the session and decide which panel to mount. */

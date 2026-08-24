@@ -7,6 +7,7 @@ import bookingRoutes from './booking.routes.js';
 import reviewRoutes from './review.routes.js';
 import notificationRoutes from './notification.routes.js';
 import adminRoutes from './admin.routes.js';
+import databaseRoutes from './database.routes.js';
 import insightsRoutes from './insights.routes.js';
 import { listCooperatives, getCooperative } from '../controllers/notification.controller.js';
 import { validate } from '../middleware/validate.js';
@@ -42,6 +43,7 @@ router.get('/health', (_req, res) =>
  *   /workers        — discovery + the WORKER panel     (public / role=worker)
  *   /bookings       — the CUSTOMER panel               (role=customer)
  *   /admin          — the ADMIN panel                  (role=admin)
+ *   /database       — raw collection browser           (owner only)
  *   /insights       — demand analytics                 (any signed-in role)
  *   /reviews        — ratings                          (public read / customer write)
  *   /notifications  — per-user inbox                   (any signed-in role)
@@ -54,6 +56,7 @@ router.use('/bookings', bookingRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/admin', adminRoutes);
+router.use('/database', databaseRoutes);
 router.use('/insights', insightsRoutes);
 
 router.get('/cooperatives', listCooperatives);
