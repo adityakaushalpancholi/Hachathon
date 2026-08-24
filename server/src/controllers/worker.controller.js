@@ -80,7 +80,7 @@ export const nearby = asyncHandler(async (req, res) => {
 export const workerDashboard = asyncHandler(async (req, res) => {
   const worker = req.workerProfile;
 
-  const [offers, active, upcoming, recent, earnings] = await Promise.all([
+  const [offers, active, upcoming, recent, earnings, reviews] = await Promise.all([
     pendingOffersFor(worker._id),
     Booking.findOne({
       worker: worker._id,
@@ -111,6 +111,11 @@ export const workerDashboard = asyncHandler(async (req, res) => {
       .populate('customer', 'name')
       .lean(),
     workerEarnings(worker._id),
+    Review.find({ worker: worker._id })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .populate('customer', 'name')
+      .lean(),
   ]);
 
   return ok(res, {
@@ -124,6 +129,7 @@ export const workerDashboard = asyncHandler(async (req, res) => {
     upcoming,
     recent,
     earnings,
+    reviews,
   });
 });
 

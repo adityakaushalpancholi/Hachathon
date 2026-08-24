@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import {
   Power, Wallet, Briefcase, Star, Clock, Target, Zap, ArrowRight, ShieldAlert, Inbox,
+  MessageSquare, Send,
 } from 'lucide-react';
 import { workerPanel } from '../../api/index.js';
 import { useApi } from '../../hooks/useApi.js';
@@ -13,6 +14,84 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useState } from 'react';
 import OfferCard from './OfferCard.jsx';
 import ActiveJobCard from './ActiveJobCard.jsx';
+
+function ReviewCard({ review, onReplied }) {
+  const toast = useToast();
+  const [replying, setReplying] = useState(false);
+  const [text, setText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    if (!text.trim()) return;
+    setSubmitting(true);
+    try {
+      await workerPanel.respondToReview(review._id, text.trim());
+      toast.success('Reply posted');
+      setReplying(false);
+      setText('');
+      onReplied?.();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="p-4">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-navy-900">
+              {review.customer?.name ?? 'Customer'}
+            </span>
+            <span className="flex items-center gap-0.5 text-xs text-saffron-600">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star key={i} size={11} fill={i < review.rating ? 'currentColor' : 'none'} />
+              ))}
+            </span>
+            <span className="text-xs text-navy-400">{relativeTime(review.createdAt)}</span>
+          </div>
+          {review.text && (
+            <p className="mt-1 text-sm leading-relaxed text-navy-700">{review.text}</p>
+          )}
+
+          {review.response?.text ? (
+            <div className="mt-2.5 rounded-lg border border-coop-100 bg-coop-50 p-3">
+              <p className="text-xs font-semibold text-coop-700">Your reply</p>
+              <p className="mt-0.5 text-sm text-coop-900">{review.response.text}</p>
+            </div>
+          ) : replying ? (
+            <div className="mt-2.5 flex gap-2">
+              <input
+                type="text"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="Write your reply…"
+                maxLength={500}
+                className="input flex-1 text-sm"
+                onKeyDown={(e) => e.key === 'Enter' && submit()}
+                disabled={submitting}
+                autoFocus
+              />
+              <button onClick={submit} disabled={submitting || !text.trim()} className="btn-coop btn-sm">
+                {submitting ? <Spinner size={13} /> : <Send size={13} />}
+                Reply
+              </button>
+              <button onClick={() => { setReplying(false); setText(''); }} className="btn-ghost btn-sm" disabled={submitting}>
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setReplying(true)} className="btn-ghost btn-sm mt-2">
+              <MessageSquare size={13} /> Reply
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function WorkerHome() {
   const toast = useToast();
@@ -290,6 +369,21 @@ export default function WorkerHome() {
                       +{inr(j.pricing?.workerPayout)}
                     </p>
                   </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ----------------------------- reviews ----------------------------- */}
+          {data.reviews?.length > 0 && (
+            <section>
+              <SectionHeader
+                title={`Your reviews (${data.reviews.length})`}
+                hint="You can reply to any review — your response is visible to customers."
+              />
+              <div className="card divide-y divide-navy-50">
+                {data.reviews.map((r) => (
+                  <ReviewCard key={r._id} review={r} onReplied={() => reload({ silent: true })} />
                 ))}
               </div>
             </section>

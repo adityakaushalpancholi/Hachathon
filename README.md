@@ -198,6 +198,9 @@ Honest about what this prototype does not do:
   the dispatch index read whatever the last ping wrote.
 - **Document numbers in the seed are masked.** Real identity documents belong in
   an encrypted vault, never in the application database.
+- **No file upload endpoint.** `Worker.photo`, verification documents, and review
+  photos have schema fields but no upload route — a production deployment would
+  add multer (or a presigned-URL flow to S3/GCS) behind a size and type guard.
 - **Accessibility has a baseline, not an audit.** Semantic elements, labelled
   controls, focus rings, a table view behind every chart, and no color-only
   encoding — but no screen-reader testing has been done.
