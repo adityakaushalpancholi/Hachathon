@@ -28,9 +28,9 @@ services:
         sync: false
       - key: RAZORPAY_WEBHOOK_SECRET
         sync: false
-      # ARMED FOR ONE RUN. This deployment was demo-seeded before it went live,
-      # so it still holds those invented accounts with passwords that are in the
-      # git history. The purge is idempotent and refuses a database without the
-      # demo seed's mark; set back to "false" once it has run.
+      # One-shot cleanup for a deployment that was demo-seeded before it went
+      # live. Note this file only takes effect on a Blueprint-managed service;
+      # on a service created through the dashboard, set it there instead.
+      # Idempotent, and refuses a database without the demo seed's mark.
       - key: PURGE_DEMO
-        value: "true"
+        value: "false"
