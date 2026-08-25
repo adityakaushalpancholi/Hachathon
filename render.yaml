@@ -28,8 +28,9 @@ services:
         sync: false
       - key: RAZORPAY_WEBHOOK_SECRET
         sync: false
-      # One-shot cleanup for a deployment that was demo-seeded before it went
-      # live: set to "true", redeploy, then set it back. Refuses to touch a
-      # database without the demo seed's mark, and keeps the catalogue.
+      # ARMED FOR ONE RUN. This deployment was demo-seeded before it went live,
+      # so it still holds those invented accounts with passwords that are in the
+      # git history. The purge is idempotent and refuses a database without the
+      # demo seed's mark; set back to "false" once it has run.
       - key: PURGE_DEMO
-        value: "false"
+        value: "true"
