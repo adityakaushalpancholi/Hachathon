@@ -38,6 +38,13 @@ export async function dispatchBooking(bookingId, { round = 1 } = {}) {
     .filter((c) => c.response !== 'pending')
     .map((c) => c.worker);
 
+  /* A booking scheduled for later must respect rosters and existing slots; one
+     happening now is governed by who is online, which is more current than any
+     roster. The scheduler dispatches ahead of the slot, so `scheduledFor` is
+     genuinely in the future here rather than approximately now. */
+  const scheduledAhead =
+    !isEmergency && booking.scheduledFor && booking.scheduledFor.getTime() - Date.now() > 15 * 60_000;
+
   const { workers, radiusKm } = await findWithExpandingRadius({
     coordinates: booking.address.location.coordinates,
     skillTag: booking.skillTag,
@@ -46,6 +53,7 @@ export async function dispatchBooking(bookingId, { round = 1 } = {}) {
     requireOnline: true,
     requireEmergency: isEmergency,
     excludeWorkerIds: alreadyOffered,
+    when: scheduledAhead ? booking.scheduledFor : null,
   });
 
   if (!workers.length) {

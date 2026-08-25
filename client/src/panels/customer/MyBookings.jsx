@@ -116,9 +116,22 @@ export default function MyBookings() {
 
                   <div className="shrink-0 text-right">
                     <p className="tnum font-bold text-navy-900">{inr(b.pricing?.total)}</p>
-                    <p className="mt-0.5 text-xs text-coop-700">
-                      {inr(b.pricing?.workerPayout)} to the pro
-                    </p>
+
+                    {/* Money owed is the thing a customer most needs to spot in a
+                        list, so it outranks the payout split for this slot. */}
+                    {b.payment?.status === 'paid' ? (
+                      <p className="mt-0.5 text-xs text-coop-700">
+                        Paid{b.payment.method === 'cash' ? ' in cash' : ''}
+                      </p>
+                    ) : b.status === 'completed' ? (
+                      <p className="mt-0.5 text-xs font-semibold text-saffron-700">Payment due</p>
+                    ) : b.status === 'cancelled' ? (
+                      <p className="mt-0.5 text-xs text-navy-400">Not charged</p>
+                    ) : (
+                      <p className="mt-0.5 text-xs text-navy-500">
+                        {b.payment?.method === 'cash' ? 'Pay on completion' : 'Not yet paid'}
+                      </p>
+                    )}
                   </div>
                 </div>
 

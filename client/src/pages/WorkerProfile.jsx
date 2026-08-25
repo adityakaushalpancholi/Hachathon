@@ -78,7 +78,7 @@ export default function WorkerProfile() {
                   <span className="text-sm font-medium text-navy-400">/hr</span>
                 </p>
                 <button onClick={book} className="btn-primary mt-3">
-                  Book this member <ArrowRight size={15} />
+                  Book this professional <ArrowRight size={15} />
                 </button>
               </div>
             </div>

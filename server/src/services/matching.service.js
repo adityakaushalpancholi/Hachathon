@@ -2,6 +2,7 @@ import { Worker } from '../models/index.js';
 import { env } from '../config/env.js';
 import { VERIFICATION_STATUS } from '../config/constants.js';
 import { estimateEtaMins, kmToMeters } from '../utils/geo.js';
+import { isWithinShift, busyWorkerIds } from './availability.service.js';
 
 /**
  * Ranking weights. Distance dominates — a plumber 2 km away who arrives in
@@ -17,11 +18,11 @@ const WEIGHTS = {
 };
 
 /**
- * Fairness term — the cooperative's answer to winner-take-all dispatch.
+ * Fairness term — the counterweight to winner-take-all dispatch.
  *
- * On an investor-owned platform the highest-rated worker in a zone absorbs most
- * of the volume and newcomers starve. Here, a member who has worked fewer jobs
- * this month gets a ranking boost, so work spreads across the membership. It is
+ * Rank purely on rating and the best-rated professional in a zone absorbs the
+ * volume while newcomers never get a first job to be rated on. Someone who has
+ * worked fewer jobs than the local median gets a boost, so work spreads. It is
  * bounded so it can never override a large distance or a poor rating.
  */
 function fairnessScore(worker, medianJobs) {
@@ -68,6 +69,12 @@ export async function findNearbyWorkers({
   requireOnline = true,
   requireEmergency = false,
   excludeWorkerIds = [],
+  /**
+   * When the work actually happens. Given a time, candidates are additionally
+   * filtered by their own roster and by whether that slot is already taken —
+   * neither of which `isOnline` can answer about a job three days out.
+   */
+  when = null,
 }) {
   const match = {
     'verification.status': VERIFICATION_STATUS.VERIFIED,
@@ -104,11 +111,25 @@ export async function findNearbyWorkers({
 
   if (!results.length) return [];
 
+  /* Scheduled work has two constraints that live availability cannot express:
+     the professional's declared roster, and a slot they have already promised
+     to somebody else. Both are skipped for immediate work, where being online
+     is the stronger and more current signal. */
+  let available = results;
+
+  if (when) {
+    const rostered = results.filter((w) => isWithinShift(w, when));
+    const busy = await busyWorkerIds(rostered.map((w) => w._id), when);
+    available = rostered.filter((w) => !busy.has(String(w._id)));
+  }
+
+  if (!available.length) return [];
+
   // Median completed-jobs count across this candidate pool, for the fairness term.
-  const jobCounts = results.map((w) => w.stats?.jobsCompleted ?? 0).sort((a, b) => a - b);
+  const jobCounts = available.map((w) => w.stats?.jobsCompleted ?? 0).sort((a, b) => a - b);
   const medianJobs = jobCounts[Math.floor(jobCounts.length / 2)] || 1;
 
-  return results
+  return available
     .map((w) => {
       const distanceKm = Math.round((w.distanceMeters / 1000) * 100) / 100;
       // A worker's own service radius is a hard constraint they set themselves.

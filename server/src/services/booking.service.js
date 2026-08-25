@@ -2,6 +2,7 @@ import { Booking, Worker, Service, Cooperative, User } from '../models/index.js'
 import {
   BOOKING_STATUS,
   BOOKING_TYPE,
+  PAYMENT_METHOD,
   PAYMENT_STATUS,
   STATUS_TRANSITIONS,
 } from '../config/constants.js';
@@ -11,6 +12,8 @@ import { toPoint } from '../utils/geo.js';
 import { buildPricing, computeSurge, cancellationFee, emergencySurchargeFor } from './pricing.service.js';
 import { dispatchBooking, dispatchToWorker } from './dispatch.service.js';
 import { notifyBookingUpdate, notifyPayment } from './notification.service.js';
+
+const inr = (n) => `₹${Math.round(n).toLocaleString('en-IN')}`;
 
 /** Guard every state change against the transition table in constants.js. */
 export function assertTransition(from, to) {
@@ -210,10 +213,38 @@ export async function completeJob(bookingId, workerId, code) {
   const now = new Date();
   booking.status = BOOKING_STATUS.COMPLETED;
   booking.otp.completeVerifiedAt = now;
-  booking.payment.status = PAYMENT_STATUS.PAID;
-  booking.payment.paidAt = now;
-  booking.payment.txnId = booking.payment.txnId || txnRef();
-  booking.pushTimeline(BOOKING_STATUS.COMPLETED, 'worker', 'Completion code verified');
+
+  /**
+   * Finishing the work is not the same event as being paid.
+   *
+   * Cash is genuinely settled here — the professional has the money in hand,
+   * and verifying the completion code with the customer standing there is the
+   * closest thing to a receipt this flow has.
+   *
+   * An online booking is not. It is settled by the gateway, against a signature
+   * only Razorpay can produce, and nowhere else. Marking it paid here would
+   * have the worker's code entry assert that money arrived — and the previous
+   * version went further and invented a transaction reference for it, so an
+   * unpaid booking became indistinguishable from a paid one in the ledger.
+   * It stays unpaid, and the customer keeps a Pay button.
+   */
+  const settledInPerson = [PAYMENT_METHOD.CASH, PAYMENT_METHOD.WALLET].includes(
+    booking.payment.method,
+  );
+
+  if (settledInPerson && booking.payment.status !== PAYMENT_STATUS.PAID) {
+    booking.payment.status = PAYMENT_STATUS.PAID;
+    booking.payment.paidAt = now;
+    booking.payment.txnId = booking.payment.txnId || txnRef('CASH');
+  }
+
+  booking.pushTimeline(
+    BOOKING_STATUS.COMPLETED,
+    'worker',
+    booking.payment.status === PAYMENT_STATUS.PAID
+      ? 'Completion code verified'
+      : 'Completion code verified — payment still outstanding',
+  );
   await booking.save();
 
   const { workerPayout, coopCommission, total } = booking.pricing;
@@ -244,13 +275,22 @@ export async function completeJob(bookingId, workerId, code) {
     );
   }
 
-  await notifyPayment(booking.customer, booking);
-  await notifyBookingUpdate(
-    booking.customer,
-    booking,
-    'Job completed — rate your experience',
-    `${booking.serviceName} by your cooperative member`,
-  );
+  if (booking.payment.status === PAYMENT_STATUS.PAID) {
+    await notifyPayment(booking.customer, booking);
+    await notifyBookingUpdate(
+      booking.customer,
+      booking,
+      'Job completed — rate your experience',
+      `${booking.serviceName} · ${inr(total)} paid`,
+    );
+  } else {
+    await notifyBookingUpdate(
+      booking.customer,
+      booking,
+      `Job completed — ${inr(total)} due`,
+      `${booking.serviceName}. Pay from the booking to settle it.`,
+    );
+  }
 
   return booking;
 }

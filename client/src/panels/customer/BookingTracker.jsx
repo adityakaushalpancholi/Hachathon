@@ -79,7 +79,9 @@ export default function BookingTracker() {
                 <p className="text-xs text-navy-500">
                   {booking.payment.status === 'paid'
                     ? `Paid · ${booking.payment.method}`
-                    : 'Pay now or on completion'}
+                    : booking.status === 'completed'
+                      ? 'Payment due'
+                      : 'Pay now or on completion'}
                 </p>
               </div>
             </div>
@@ -226,9 +228,23 @@ export default function BookingTracker() {
           />
 
           {/* Paying up front is optional — cash on completion stays available,
-              which is why this disappears entirely rather than blocking. */}
+              which is why this disappears entirely rather than blocking. Once
+              the job is done and still unpaid, it is the only thing left to do. */}
           {booking.status !== 'cancelled' && (
-            <PayButton booking={booking} onPaid={() => reload({ silent: true })} />
+            <div
+              className={
+                booking.status === 'completed' && booking.payment.status !== 'paid'
+                  ? 'card-pad border-saffron-300 bg-saffron-50'
+                  : ''
+              }
+            >
+              {booking.status === 'completed' && booking.payment.status !== 'paid' && (
+                <p className="mb-3 text-sm font-semibold text-saffron-900">
+                  This job is finished and {inr(booking.pricing.total)} is still outstanding.
+                </p>
+              )}
+              <PayButton booking={booking} onPaid={() => reload({ silent: true })} />
+            </div>
           )}
 
           {/* ----------------------------- actions ---------------------------- */}

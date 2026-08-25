@@ -487,7 +487,90 @@ async function main() {
     body: { code: detail2.data.otp.complete },
   });
   check('correct completion code closes the job', complete.data?.status === 'completed', complete);
-  check('payment settles on completion', complete.data?.payment?.status === 'paid', complete.data?.payment);
+
+  /* Cash is genuinely settled by finishing the job — the professional has the
+     money in hand and the customer is standing there. */
+  check('a cash booking settles on completion', complete.data?.payment?.status === 'paid', complete.data?.payment);
+  check('the cash settlement is labelled as cash', complete.data?.payment?.method === 'cash', complete.data?.payment);
+
+  /**
+   * The same flow, paid online instead — and never actually paid.
+   *
+   * Completion must not settle it. Only the gateway can, against a signature
+   * only Razorpay can produce. A version of this marked the booking paid here
+   * and invented a transaction reference for it, which made an unpaid booking
+   * indistinguishable from a paid one and credited the professional for money
+   * that never arrived.
+   */
+  section('Completion does not fabricate payment');
+
+  const onlineBooking = await api('POST', '/bookings', {
+    token: custToken,
+    body: {
+      serviceId: service._id,
+      packageName: service.packages[0].name,
+      address: {
+        label: 'Home',
+        line1: '402, Sunrise Apartments',
+        city: 'Mumbai',
+        pincode: '400050',
+        zone: 'Bandra West',
+        location: { lat: 19.0596, lng: 72.8296 },
+      },
+      type: 'standard',
+      paymentMethod: 'razorpay',
+    },
+  });
+
+  check('a booking can be opened for online payment', onlineBooking.status === 201, onlineBooking);
+  check('it is labelled for the gateway', onlineBooking.data?.payment?.method === 'razorpay', onlineBooking.data?.payment);
+  check('it starts unpaid', onlineBooking.data?.payment?.status !== 'paid', onlineBooking.data?.payment);
+
+  const onlineId = onlineBooking.data?._id;
+  const onlineCandidate = onlineBooking.data?.dispatch?.candidates?.[0]?.worker;
+
+  const onlinePhone = onlineCandidate
+    ? await resolveWorkerPhone(onlineCandidate, adminToken)
+    : null;
+  check('resolved the worker offered the online job', !!onlinePhone, onlineCandidate);
+
+  if (onlineId && onlinePhone) {
+    const cwSession = await api('POST', '/auth/login', {
+      body: { phone: onlinePhone, password: 'worker123' },
+    });
+    const cwToken = cwSession.data?.token;
+    check('that worker can sign in', !!cwToken, cwSession);
+
+    if (cwToken) {
+      await api('POST', `/workers/me/offers/${onlineId}/accept`, { token: cwToken });
+      await api('POST', `/workers/me/jobs/${onlineId}/enroute`, { token: cwToken });
+      await api('POST', `/workers/me/jobs/${onlineId}/arrived`, { token: cwToken });
+
+      const d1 = await api('GET', `/bookings/${onlineId}`, { token: custToken });
+      await api('POST', `/workers/me/jobs/${onlineId}/start`, {
+        token: cwToken,
+        body: { code: d1.data.otp.start },
+      });
+
+      const d2 = await api('GET', `/bookings/${onlineId}`, { token: custToken });
+      const done = await api('POST', `/workers/me/jobs/${onlineId}/complete`, {
+        token: cwToken,
+        body: { code: d2.data.otp.complete },
+      });
+
+      check('the online job completes', done.data?.status === 'completed', done);
+      check(
+        'completing it does NOT mark it paid',
+        done.data?.payment?.status !== 'paid',
+        done.data?.payment,
+      );
+      check(
+        'no transaction reference is invented for it',
+        !done.data?.payment?.txnId,
+        done.data?.payment,
+      );
+    }
+  }
 
   /* -------------------------------- review ----------------------------- */
   section('Reviews');
