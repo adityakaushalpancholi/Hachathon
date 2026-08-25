@@ -44,12 +44,13 @@ export function createApp() {
             directives: {
               defaultSrc: ["'self'"],
               scriptSrc: ["'self'", ...RAZORPAY_ORIGINS],
-              // Tailwind ships a stylesheet, but Checkout injects inline styles.
-              styleSrc: ["'self'", "'unsafe-inline'"],
+              // Checkout injects inline styles; index.html links Google Fonts.
+              styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
               imgSrc: ["'self'", 'data:', 'https:'],
               connectSrc: ["'self'", ...RAZORPAY_ORIGINS],
               frameSrc: ["'self'", ...RAZORPAY_ORIGINS],
-              fontSrc: ["'self'", 'data:'],
+              // The stylesheet above pulls its font files from a second origin.
+              fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
               objectSrc: ["'none'"],
               baseUri: ["'self'"],
               formAction: ["'self'"],
