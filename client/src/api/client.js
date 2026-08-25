@@ -4,14 +4,32 @@ const TOKEN_KEY = 'shramsetu.token';
 /* ------------------------------ token store ------------------------------ */
 
 /**
- * The session token is the panel key. It decides which panel the app mounts and
- * is re-checked server-side on every panel-scoped request, so a tampered copy in
- * localStorage grants nothing — it only changes which screen fails.
+ * The session token, held in `sessionStorage` — deliberately not localStorage.
+ *
+ * sessionStorage is scoped to the tab and is discarded when that tab closes, so
+ * every fresh visit starts signed out and a shared or public machine does not
+ * hand the next person an open session. Reloading, or navigating within the
+ * tab, keeps you signed in: a refresh is not a new visit, and logging someone
+ * out for pressing F5 teaches them to distrust the app.
+ *
+ * The token is the panel key and is re-checked server-side on every
+ * panel-scoped request, so a tampered copy grants nothing — it only changes
+ * which screen fails.
  */
 export const tokenStore = {
-  get: () => localStorage.getItem(TOKEN_KEY),
-  set: (t) => localStorage.setItem(TOKEN_KEY, t),
-  clear: () => localStorage.removeItem(TOKEN_KEY),
+  get: () => sessionStorage.getItem(TOKEN_KEY),
+  set: (t) => sessionStorage.setItem(TOKEN_KEY, t),
+  clear: () => {
+    sessionStorage.removeItem(TOKEN_KEY);
+    // Clear the old localStorage key too, so anyone carrying a session from a
+    // previous build is signed out once rather than left with a stale token
+    // that nothing reads.
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch {
+      /* private-mode browsers throw on storage access; nothing to do */
+    }
+  },
 };
 
 /** Listeners notified when the server rejects our token (expiry, deactivation). */
@@ -59,6 +77,16 @@ async function request(method, path, { body, params, signal, auth = true } = {})
         ...(body ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
+      /**
+       * Never answer from the browser's HTTP cache.
+       *
+       * Bookings, job offers and balances change while the page is open, and a
+       * cached 200 is indistinguishable from a fresh one to the code reading
+       * it — you simply get yesterday's number with no indication anything is
+       * wrong. `no-store` also keeps responses off disk, which matters when the
+       * response body is somebody's address and phone number.
+       */
+      cache: 'no-store',
       ...(body ? { body: JSON.stringify(body) } : {}),
       signal,
     });

@@ -6,10 +6,16 @@ const AuthContext = createContext(null);
 /**
  * Session state.
  *
- * On boot the app calls `/auth/me` with whatever token is in localStorage. The
- * server answers with the user *and* a `panel` field naming the role it will
- * actually honour. The client never decides its own access level — it only
- * renders what the server has already agreed to.
+ * Only the token is ever stored, and only for the lifetime of the tab. Every
+ * other fact about the account — name, role, panel, company, verification
+ * state — is fetched from `/auth/me` and held in memory. Nothing about who you
+ * are is read back off the browser.
+ *
+ * That is not tidiness. A stored user object is a claim the client makes about
+ * itself, and it goes stale silently: an account demoted, deactivated or
+ * verified server-side would keep rendering its old panel until something
+ * happened to refresh it. Asking the server means the answer is current, and
+ * the server is the only party entitled to give it.
  */
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
@@ -20,12 +26,19 @@ export function AuthProvider({ children }) {
     setSession(payload);
   }, []);
 
+  /** Re-read the account from the server, discarding whatever is in memory. */
+  const reloadFromServer = useCallback(async () => {
+    const me = await authApi.me();
+    setSession(me);
+    return me;
+  }, []);
+
   const logout = useCallback(() => {
     tokenStore.clear();
     setSession(null);
   }, []);
 
-  // Rehydrate on load.
+  // Rehydrate on load: token from the tab, everything else from the server.
   useEffect(() => {
     let cancelled = false;
 
@@ -38,7 +51,7 @@ export function AuthProvider({ children }) {
         const me = await authApi.me();
         if (!cancelled) setSession(me);
       } catch {
-        tokenStore.clear(); // expired or revoked
+        tokenStore.clear(); // expired, revoked, or the account was deactivated
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -47,6 +60,27 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  /**
+   * Re-read the account when the tab is brought back to the foreground.
+   *
+   * A panel left open in a background tab for an hour is showing an hour-old
+   * answer, and the most common thing to change in that hour is exactly what
+   * this payload carries — a verification approved, a role adjusted, an account
+   * switched off. A failure here is left alone deliberately: the 401 handler
+   * below already drops a dead session, and a transient network blip should not
+   * throw someone out of a panel they are still entitled to.
+   */
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && tokenStore.get()) {
+        authApi.me().then(setSession, () => {});
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
 
   // Any 401 anywhere in the app drops the session, so a revoked token cannot
@@ -86,11 +120,7 @@ export function AuthProvider({ children }) {
     [applySession],
   );
 
-  const refresh = useCallback(async () => {
-    const me = await authApi.me();
-    setSession(me);
-    return me;
-  }, []);
+  const refresh = reloadFromServer;
 
   const value = useMemo(
     () => ({

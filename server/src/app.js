@@ -117,6 +117,22 @@ export function createApp() {
     });
   });
 
+  /**
+   * No API response is ever cacheable.
+   *
+   * Everything under /api is either per-account or changes minute to minute,
+   * and a stale 200 is indistinguishable from a fresh one to whatever reads it
+   * — you get yesterday's balance with nothing to indicate it. `private` also
+   * keeps a shared proxy from holding one customer's bookings and handing them
+   * to the next caller. The static bundle below is untouched by this and keeps
+   * its year-long immutable caching, which is where caching actually pays.
+   */
+  app.use('/api', (_req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+    next();
+  });
+
   app.use('/api', corsGuard, generalLimiter, routes);
 
   // In production, serve the built React app from ../client/dist.
