@@ -79,6 +79,18 @@ export async function findNearbyWorkers({
    */
   ignoreServiceRadius = false,
   /**
+   * Keep professionals whose own radius falls short, marked rather than dropped.
+   *
+   * Browsing and dispatching want opposite things here. Dispatch must not offer
+   * a job to someone who has said they will not travel that far — that is a
+   * promise to the professional. But a customer *looking* at the map is not
+   * dispatching anything: showing an empty screen when somebody willing is two
+   * kilometres past their stated limit helps nobody, and directly requesting a
+   * professional already ignores the radius, so hiding them is the only thing
+   * standing between the two sides.
+   */
+  includeOutOfRange = false,
+  /**
    * When the work actually happens. Given a time, candidates are additionally
    * filtered by their own roster and by whether that slot is already taken —
    * neither of which `isOnline` can answer about a job three days out.
@@ -141,8 +153,11 @@ export async function findNearbyWorkers({
   return available
     .map((w) => {
       const distanceKm = Math.round((w.distanceMeters / 1000) * 100) / 100;
-      // A worker's own service radius is a hard constraint they set themselves.
-      if (!ignoreServiceRadius && distanceKm > (w.serviceRadiusKm ?? radiusKm)) return null;
+
+      // The radius a professional set for themselves. A hard constraint when
+      // dispatching; a label when browsing.
+      const coversYou = distanceKm <= (w.serviceRadiusKm ?? radiusKm);
+      if (!coversYou && !ignoreServiceRadius && !includeOutOfRange) return null;
 
       const { score, breakdown } = scoreWorker(w, distanceKm, radiusKm, medianJobs);
       return {
@@ -151,11 +166,15 @@ export async function findNearbyWorkers({
         etaMins: estimateEtaMins(distanceKm),
         matchScore: score,
         matchBreakdown: breakdown,
+        coversYou,
         cooperativeName: w.coop?.name,
       };
     })
     .filter(Boolean)
-    .sort((a, b) => b.matchScore - a.matchScore)
+    // Anyone who covers the address comes first; past that, rank as usual. A
+    // professional who has committed to the area should never sit below one who
+    // has not, however good their rating.
+    .sort((a, b) => (b.coversYou ? 1 : 0) - (a.coversYou ? 1 : 0) || b.matchScore - a.matchScore)
     .slice(0, limit);
 }
 

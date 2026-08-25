@@ -613,12 +613,16 @@ async function main() {
   const FAR = { lat: 19.1868, lng: 72.8484 }; // ~10.8 km north of it
 
   const mySkill = workerProfile.data?.skills?.[0]?.skillTag;
-  const seenFrom = async (loc) => {
+  /* Browsing lists them either way — see 'A customer can reach someone just
+     outside their range'. What changes is whether they have committed to the
+     address, which is what `coversYou` reports. */
+  const coverageFrom = async () => {
     const near = await api(
       'GET',
       `/workers/nearby?lat=${FAR.lat}&lng=${FAR.lng}&radiusKm=25&limit=50${mySkill ? `&skillTag=${mySkill}` : ''}`,
     );
-    return (near.data ?? []).some((w) => String(w._id) === String(offeredWorkerId));
+    const hit = (near.data ?? []).find((w) => String(w._id) === String(offeredWorkerId));
+    return hit ? hit.coversYou : null;
   };
 
   const atHq = await api('PATCH', '/workers/me/availability', {
@@ -629,9 +633,9 @@ async function main() {
   check('the radius they chose is stored', atHq.data?.serviceRadiusKm === 8, atHq.data);
 
   check(
-    'someone outside the radius does not see them',
-    (await seenFrom()) === false,
-    'visible from 10.8 km away with an 8 km radius',
+    'an 8 km radius does not cover an address 10.8 km away',
+    (await coverageFrom()) === false,
+    'reported as covering an address outside the radius',
   );
 
   await api('PATCH', '/workers/me/availability', {
@@ -639,9 +643,9 @@ async function main() {
     body: { isOnline: true, location: FAR, serviceRadiusKm: 8 },
   });
   check(
-    'moving their base area makes them findable there',
-    (await seenFrom()) === true,
-    'still invisible after moving to the customer',
+    'moving their base area makes them cover it',
+    (await coverageFrom()) === true,
+    'still not covering the address after moving to it',
   );
 
   const badBase = await api('PATCH', '/workers/me/availability', {
@@ -710,6 +714,32 @@ async function main() {
   check(
     'a customer cannot edit a professional profile',
     (await api('PATCH', '/workers/me/profile', { token: custToken, body: { bio: 'x' } })).status === 403,
+  );
+
+  section('A customer can reach someone just outside their range');
+
+  /* The reported fault in its final form: a professional online and correctly
+     placed, whose own radius simply does not reach the customer. Dispatch must
+     keep honouring that radius — it is a promise to the professional — but
+     browsing must not hide them, because requesting someone directly already
+     ignores it. Hiding them was the only thing standing between the two sides. */
+  const FARAWAY = { lat: 19.1868, lng: 72.8484 };
+
+  await api('PATCH', '/workers/me/availability', {
+    token: wToken,
+    body: { isOnline: true, location: { lat: 19.0596, lng: 72.8296 }, serviceRadiusKm: 5 },
+  });
+
+  const browse = await api('GET', `/workers/nearby?lat=${FARAWAY.lat}&lng=${FARAWAY.lng}&radiusKm=25&limit=50`);
+  const seen = (browse.data ?? []).find((w) => String(w._id) === String(offeredWorkerId));
+  check('browsing finds a professional whose radius falls short', !!seen, 'hidden from browse');
+  check('and marks them as outside their area', seen?.coversYou === false, seen);
+  check('the meta counts who actually covers the address', typeof browse.meta?.covering === 'number', browse.meta);
+
+  check(
+    'those who cover the address are ranked first',
+    (browse.data ?? []).every((w, i, arr) => i === 0 || !(w.coversYou && !arr[i - 1].coversYou)),
+    'an uncommitted professional outranked a committed one',
   );
 
   section('Why a search came back empty');

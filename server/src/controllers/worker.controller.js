@@ -70,6 +70,10 @@ export const nearby = asyncHandler(async (req, res) => {
     limit,
     requireOnline: online ?? false,
     requireEmergency: emergency ?? false,
+    // Browsing, not dispatching — see the note on this option. Someone just
+    // past their stated range can still be requested directly, so hiding them
+    // only breaks the connection this screen exists to make.
+    includeOutOfRange: true,
   });
 
   /* An empty list is the one answer that explains nothing, so when it happens
@@ -82,6 +86,7 @@ export const nearby = asyncHandler(async (req, res) => {
     radiusKm,
     center: [lng, lat],
     count: workers.length,
+    covering: workers.filter((w) => w.coversYou).length,
     ...(explanation ? { empty: explanation } : {}),
   });
 });

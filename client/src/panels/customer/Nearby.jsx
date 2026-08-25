@@ -43,6 +43,11 @@ export default function Nearby() {
      nothing at all is the one answer that leaves a customer unable to act —
      they cannot tell a broken product from an uncovered address. */
   const emptyReason = data?.meta?.empty;
+  /* Someone just past their stated range can still be requested directly, so
+     they are shown — but never mixed in with those who have committed to the
+     area, or the list quietly overstates who is actually available. */
+  const covering = workers.filter((w) => w.coversYou !== false);
+  const outOfRange = workers.filter((w) => w.coversYou === false);
 
   if (!home) {
     return (
@@ -159,6 +164,13 @@ export default function Nearby() {
               />
             ) : (
               <div className="max-h-[560px] space-y-2.5 overflow-y-auto pr-1">
+                {covering.length === 0 && outOfRange.length > 0 && (
+                  <p className="rounded-lg border border-saffron-200 bg-saffron-50 p-3 text-xs leading-relaxed text-saffron-900">
+                    Nobody has set their coverage to include your address. The professionals
+                    below work nearby and can still be requested directly &mdash; they will
+                    decide whether to travel.
+                  </p>
+                )}
                 {workers.map((w, i) => (
                   <button
                     key={w._id}
@@ -185,6 +197,11 @@ export default function Nearby() {
                         <RatingStars value={w.rating?.average ?? 0} size={11} showValue={false} />
                         <span className="tnum text-xs text-navy-500">
                           {km(w.distanceKm)} · {w.etaMins} min
+                          {w.coversYou === false && (
+                            <span className="ml-1.5 rounded bg-saffron-100 px-1.5 py-0.5 text-[10px] font-semibold text-saffron-800">
+                              outside their area
+                            </span>
+                          )}
                         </span>
                       </div>
                     </div>
