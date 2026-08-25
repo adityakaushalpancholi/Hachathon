@@ -76,6 +76,15 @@ export const notifyPayout = (userId, payout) =>
     data: { payoutId: String(payout._id) },
   });
 
+/** Someone else changed how far this professional travels — always tell them. */
+export const notifyCoverageChange = (userId, changed, note) =>
+  notify(userId, {
+    type: NOTIFICATION_TYPE.SYSTEM,
+    title: 'Your work area was updated',
+    body: `${changed}. ${note}`.slice(0, 300),
+    data: { changed },
+  });
+
 export const notifySos = (userIds, booking, raisedBy) =>
   notifyMany(userIds, {
     type: NOTIFICATION_TYPE.SOS,

@@ -7,6 +7,7 @@ import {
   listWorkersQuery,
   listBookingsQuery,
   verifyWorkerSchema,
+  coverageSchema,
   settlementSchema,
   trendQuery,
   cancelSchema,
@@ -26,6 +27,7 @@ router.get('/overview', ctrl.overview);
 
 router.get('/workers', validate({ query: listWorkersQuery }), ctrl.listWorkers);
 router.patch('/workers/:id/verification', validate({ params: idParam, body: verifyWorkerSchema }), ctrl.setVerification);
+router.patch('/workers/:id/coverage', validate({ params: idParam, body: coverageSchema }), ctrl.setCoverage);
 router.patch('/workers/:id/documents/:docId', validate({ params: idParam }), ctrl.reviewDocument);
 
 router.get('/bookings', validate({ query: listBookingsQuery }), ctrl.listBookings);

@@ -742,6 +742,51 @@ async function main() {
     'an uncommitted professional outranked a committed one',
   );
 
+  section('An operator can adjust coverage');
+
+  const covBefore = await api('GET', `/workers/${offeredWorkerId}`);
+  const cov = await api('PATCH', `/admin/workers/${offeredWorkerId}/coverage`, {
+    token: adminToken,
+    body: { serviceRadiusKm: 30, note: 'Widened to cover the northern suburbs' },
+  });
+  check('an admin can widen a radius', cov.status === 200, cov);
+  check('the new radius is stored', cov.data?.worker?.serviceRadiusKm === 30, cov.data?.worker?.serviceRadiusKm);
+  check('the change is reported back', Array.isArray(cov.data?.changed) && cov.data.changed.length > 0, cov.data?.changed);
+
+  /* Changing how far somebody has agreed to travel without telling them would
+     mean them arriving 25 km from home having never agreed to it. */
+  const wNotes = await api('GET', '/notifications', { token: wToken });
+  check(
+    'the professional is told their area changed',
+    (wNotes.data?.items ?? wNotes.data ?? []).some((n) => /work area/i.test(n.title ?? '')),
+    wNotes.data,
+  );
+
+  const noReason = await api('PATCH', `/admin/workers/${offeredWorkerId}/coverage`, {
+    token: adminToken,
+    body: { serviceRadiusKm: 20 },
+  });
+  check('a coverage change without a reason is refused', noReason.status === 400, noReason);
+
+  const absurd = await api('PATCH', `/admin/workers/${offeredWorkerId}/coverage`, {
+    token: adminToken,
+    body: { serviceRadiusKm: 500, note: 'too far' },
+  });
+  check('an absurd radius is refused', absurd.status === 400, absurd);
+
+  check(
+    'a customer cannot change coverage for anyone',
+    (await api('PATCH', `/admin/workers/${offeredWorkerId}/coverage`, {
+      token: custToken, body: { serviceRadiusKm: 30, note: 'nope' },
+    })).status === 403,
+  );
+
+  check(
+    'the wider radius now covers a far address',
+    (await coverageFrom()) === true,
+    'still not covering after widening to 30 km',
+  );
+
   section('Why a search came back empty');
 
   const nowhere = await api('GET', '/workers/nearby?lat=28.6139&lng=77.2090&radiusKm=10&online=true');

@@ -140,6 +140,25 @@ export const workerProfileSchema = z
   })
   .refine((v) => Object.keys(v).length > 0, { message: 'Nothing to update' });
 
+/**
+ * An operator adjusting a professional's coverage.
+ *
+ * Separate from `availabilitySchema` because the two answer different
+ * questions: that one is a professional describing themselves, this one is
+ * somebody else changing that description. `note` is required so the change
+ * always arrives with a reason attached — an unexplained edit to how far
+ * somebody has agreed to travel is not a support action, it is a surprise.
+ */
+export const coverageSchema = z
+  .object({
+    serviceRadiusKm: coerceNum(z.number().min(1).max(50)).optional(),
+    location: locationSchema.optional(),
+    note: z.string().min(3).max(200),
+  })
+  .refine((v) => v.serviceRadiusKm !== undefined || v.location !== undefined, {
+    message: 'Give a radius, a location, or both',
+  });
+
 export const availabilitySchema = z.object({
   isOnline: z.boolean().optional(),
   acceptsEmergency: z.boolean().optional(),

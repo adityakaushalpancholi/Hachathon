@@ -112,6 +112,7 @@ export const admin = {
   overview: () => http.get('/admin/overview'),
   workers: (params) => http.get('/admin/workers', { params }),
   setVerification: (id, payload) => http.patch(`/admin/workers/${id}/verification`, payload),
+  setCoverage: (id, payload) => http.patch(`/admin/workers/${id}/coverage`, payload),
   reviewDocument: (id, docId, payload) => http.patch(`/admin/workers/${id}/documents/${docId}`, payload),
 
   bookings: (params) => http.get('/admin/bookings', { params }),

@@ -2,12 +2,15 @@ import { Worker, Booking, Cooperative, User, Review, Payout } from '../models/in
 import { asyncHandler, ApiError } from '../utils/ApiError.js';
 import { ok, paginated } from '../utils/respond.js';
 import { BOOKING_STATUS, VERIFICATION_STATUS } from '../config/constants.js';
-import { notifyVerification } from '../services/notification.service.js';
+import { notifyVerification, notifyCoverageChange } from '../services/notification.service.js';
 import { buildSettlement, commitSettlement, releasePayout } from '../services/payout.service.js';
 import { revenueTrend, workforceGaps, zoneHeatmap } from '../services/forecast.service.js';
 import { decorateWorkers } from '../utils/decorate.js';
+import { nearestArea } from '../config/areas.js';
+import { toPoint } from '../utils/geo.js';
+import { logger } from '../utils/logger.js';
 
-/** Admin panel overview — the numbers the cooperative board actually asks for. */
+/** Admin panel overview — the numbers an operator actually asks for. */
 export const overview = asyncHandler(async (req, res) => {
   const coopId = req.user.cooperative;
   const scope = coopId ? { cooperative: coopId } : {};
@@ -128,6 +131,51 @@ export const listWorkers = asyncHandler(async (req, res) => {
  * members admitting members, which is why it is scoped to the admin's own coop
  * and recorded with the deciding user's id.
  */
+/**
+ * Adjust how far a professional travels, on their behalf.
+ *
+ * A support capability, not a routine one. A professional who cannot be found
+ * because their radius is smaller than the city they work in loses every job
+ * offer and has no idea why — and the person who can see that from the admin
+ * panel is usually not the person who can fix it from the professional's phone.
+ *
+ * The professional is notified every time, because this changes a commitment
+ * they made about their own working day. Silent edits here would mean someone
+ * arriving at a job 25 km away having never agreed to travel that far.
+ */
+export const setCoverage = asyncHandler(async (req, res) => {
+  const { serviceRadiusKm, location, note } = req.body;
+
+  const filter = { _id: req.params.id };
+  if (req.user.cooperative) filter.cooperative = req.user.cooperative;
+
+  const worker = await Worker.findOne(filter);
+  if (!worker) throw ApiError.notFound('Professional not found in your company');
+
+  const before = { radius: worker.serviceRadiusKm, area: worker.baseArea };
+
+  if (serviceRadiusKm !== undefined) worker.serviceRadiusKm = serviceRadiusKm;
+  if (location) {
+    worker.location = toPoint(location);
+    worker.baseArea = nearestArea(location.lat, location.lng)?.zone ?? worker.baseArea;
+  }
+
+  await worker.save();
+
+  const changes = [];
+  if (before.radius !== worker.serviceRadiusKm) {
+    changes.push(`travel radius ${before.radius} km → ${worker.serviceRadiusKm} km`);
+  }
+  if (before.area !== worker.baseArea) {
+    changes.push(`base area ${before.area ?? 'unset'} → ${worker.baseArea}`);
+  }
+
+  await notifyCoverageChange(worker.user, changes.join(', '), note);
+  logger.info(`coverage: ${worker.displayName} — ${changes.join(', ')} (${note})`);
+
+  return ok(res, { worker, changed: changes });
+});
+
 export const setVerification = asyncHandler(async (req, res) => {
   const { status, note, backgroundCheckClear } = req.body;
 

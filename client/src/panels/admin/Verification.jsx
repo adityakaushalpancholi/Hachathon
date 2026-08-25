@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ShieldCheck, Search, FileCheck2, Check, X, Ban, Star, Briefcase } from 'lucide-react';
+import { ShieldCheck, Search, FileCheck2, Check, X, Ban, Star, Briefcase, Radius } from 'lucide-react';
 import { admin as adminApi } from '../../api/index.js';
 import { useApi } from '../../hooks/useApi.js';
 import {
@@ -167,14 +167,98 @@ export default function Verification() {
         </>
       </Async>
 
-      <WorkerFileModal worker={selected} onClose={() => setSelected(null)} onDecide={decide} />
+      <WorkerFileModal
+        worker={selected}
+        onClose={() => setSelected(null)}
+        onDecide={decide}
+        onChanged={() => {
+          reload({ silent: true });
+          setSelected(null);
+        }}
+      />
     </div>
   );
 }
 
 /* -------------------------------------------------------------------------- */
 
-function WorkerFileModal({ worker, onClose, onDecide }) {
+/**
+ * Adjust how far a professional travels, from the operator's side.
+ *
+ * The person who can see that somebody is unreachable is rarely the person who
+ * can fix it from that professional's phone — so this exists, and it always
+ * notifies them, because it changes a commitment they made about their own
+ * working day.
+ */
+function CoverageControl({ worker, onChanged }) {
+  const [radius, setRadius] = useState(String(worker.serviceRadiusKm ?? 8));
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const toast = useToast();
+
+  const changed = Number(radius) !== (worker.serviceRadiusKm ?? 8);
+
+  const save = async () => {
+    if (note.trim().length < 3) return setError('Add a short reason — they will see it.');
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await adminApi.setCoverage(worker._id, {
+        serviceRadiusKm: Number(radius),
+        note: note.trim(),
+      });
+      toast.success(res.changed?.join(', ') || 'Coverage updated');
+      setNote('');
+      onChanged?.();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-5 rounded-lg border border-navy-200 bg-navy-50/60 p-3.5">
+      <p className="flex items-center gap-2 text-sm font-semibold text-navy-900">
+        <Radius size={14} /> How far they travel
+      </p>
+      <p className="muted mt-0.5 text-xs">
+        Currently {worker.serviceRadiusKm ?? 8} km from {worker.baseArea ?? 'their base'}.
+        Customers outside this see them marked as out of area.
+      </p>
+
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        <div>
+          <label htmlFor="cov-r" className="label text-[10px]">Radius</label>
+          <select
+            id="cov-r" value={radius} onChange={(e) => setRadius(e.target.value)}
+            className="select mt-1 h-9 w-32"
+          >
+            {[3, 5, 8, 12, 20, 30, 40, 50].map((r) => (
+              <option key={r} value={r}>{r} km</option>
+            ))}
+          </select>
+        </div>
+        <div className="min-w-[12rem] flex-1">
+          <label htmlFor="cov-n" className="label text-[10px]">Reason (they will see this)</label>
+          <input
+            id="cov-n" value={note} onChange={(e) => setNote(e.target.value)}
+            placeholder="Widened to cover the northern suburbs"
+            maxLength={200} className="input mt-1 h-9"
+          />
+        </div>
+        <button onClick={save} disabled={busy || !changed} className="btn-primary h-9 disabled:opacity-50">
+          {busy ? <Spinner size={14} /> : <Radius size={14} />} Apply
+        </button>
+      </div>
+
+      {error && <p className="mt-2 text-xs text-red-700">{error}</p>}
+    </div>
+  );
+}
+
+function WorkerFileModal({ worker, onClose, onDecide, onChanged }) {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(null);
 
@@ -206,12 +290,14 @@ function WorkerFileModal({ worker, onClose, onDecide }) {
             {busy === 'rejected' ? <Spinner size={14} /> : <X size={14} />} Reject
           </button>
           <button onClick={() => act('verified')} disabled={Boolean(busy)} className="btn-coop">
-            {busy === 'verified' ? <Spinner size={14} /> : <Check size={14} />} Verify member
+            {busy === 'verified' ? <Spinner size={14} /> : <Check size={14} />} Verify
           </button>
         </>
       }
     >
-      <div className="flex items-start gap-4">
+      <CoverageControl worker={worker} onChanged={onChanged} />
+
+      <div className="mt-5 flex items-start gap-4">
         <Avatar name={worker.displayName} src={worker.photo} size={56} />
         <div className="min-w-0 flex-1">
           <VerificationBadge status={worker.verification?.status} />

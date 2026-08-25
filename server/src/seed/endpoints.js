@@ -157,6 +157,7 @@ async function main() {
     const t = { token: adminToken };
     await probe('GET', '/admin/overview', [200], t);
     await probe('GET', '/admin/workers', [200], t);
+    await probe('PATCH', `/admin/workers/${ID}/coverage`, [404], { ...t, body: { serviceRadiusKm: 20, note: 'sweep probe' } });
     await probe('GET', '/admin/bookings', [200], t);
     await probe('GET', '/admin/sos', [200], t);
     await probe('POST', '/admin/settlements/preview', [200, 400], { ...t, body: {} });
