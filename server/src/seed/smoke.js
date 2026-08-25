@@ -598,6 +598,64 @@ async function main() {
   check('dashboard reports the share reaching workers', custDash.data?.stats?.toWorkersPct > 0, custDash.data?.stats);
 
   /* ------------------------------- insights ---------------------------- */
+  section('Where a professional works');
+
+  /**
+   * The reported fault: a verified, online professional who never appeared in
+   * any customer's search. Registration had placed them at their *company's*
+   * coordinates rather than their own, so their service radius was centred on
+   * head office and excluded everyone actually near them.
+   *
+   * `serviceRadiusKm` is a hard filter in ranking, not a preference, which is
+   * what makes the wrong centre fatal rather than merely inaccurate.
+   */
+  const HQ = { lat: 19.0896, lng: 72.8479 }; // the company address
+  const FAR = { lat: 19.1868, lng: 72.8484 }; // ~10.8 km north of it
+
+  const mySkill = workerProfile.data?.skills?.[0]?.skillTag;
+  const seenFrom = async (loc) => {
+    const near = await api(
+      'GET',
+      `/workers/nearby?lat=${FAR.lat}&lng=${FAR.lng}&radiusKm=25&limit=50${mySkill ? `&skillTag=${mySkill}` : ''}`,
+    );
+    return (near.data ?? []).some((w) => String(w._id) === String(offeredWorkerId));
+  };
+
+  const atHq = await api('PATCH', '/workers/me/availability', {
+    token: wToken,
+    body: { isOnline: true, location: HQ, serviceRadiusKm: 8 },
+  });
+  check('a professional can set their own base and radius', atHq.status === 200, atHq);
+  check('the radius they chose is stored', atHq.data?.serviceRadiusKm === 8, atHq.data);
+
+  check(
+    'someone outside the radius does not see them',
+    (await seenFrom()) === false,
+    'visible from 10.8 km away with an 8 km radius',
+  );
+
+  await api('PATCH', '/workers/me/availability', {
+    token: wToken,
+    body: { isOnline: true, location: FAR, serviceRadiusKm: 8 },
+  });
+  check(
+    'moving their base area makes them findable there',
+    (await seenFrom()) === true,
+    'still invisible after moving to the customer',
+  );
+
+  const badBase = await api('PATCH', '/workers/me/availability', {
+    token: wToken,
+    body: { location: { lat: 999, lng: 999 } },
+  });
+  check('an impossible base is refused', badBase.status === 400, badBase);
+
+  const wideRadius = await api('PATCH', '/workers/me/availability', {
+    token: wToken,
+    body: { serviceRadiusKm: 500 },
+  });
+  check('an absurd radius is refused', wideRadius.status === 400, wideRadius);
+
   section('Demand insights');
 
   const forecast = await api('GET', `/insights/forecast?skillTag=${service.skillTag}&horizonHours=24`, { token: custToken });

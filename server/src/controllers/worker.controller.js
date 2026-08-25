@@ -7,6 +7,7 @@ import { workerEarnings } from '../services/payout.service.js';
 import { advanceStatus, startJob, completeJob, cancelBooking } from '../services/booking.service.js';
 import { BOOKING_STATUS, VERIFICATION_STATUS } from '../config/constants.js';
 import { toPoint } from '../utils/geo.js';
+import { nearestArea } from '../config/areas.js';
 import { decorateWorker, decorateWorkers } from '../utils/decorate.js';
 
 /* ------------------------- public / discovery ------------------------ */
@@ -138,13 +139,21 @@ export const setAvailability = asyncHandler(async (req, res) => {
   const { isOnline, acceptsEmergency, serviceRadiusKm, location } = req.body;
 
   if (isOnline === true && worker.verification.status !== VERIFICATION_STATUS.VERIFIED) {
-    throw ApiError.forbidden('Your cooperative must verify you before you can go online');
+    throw ApiError.forbidden('Your profile must be verified before you can go online');
   }
 
   if (isOnline !== undefined) worker.availability.isOnline = isOnline;
   if (acceptsEmergency !== undefined) worker.availability.acceptsEmergency = acceptsEmergency;
   if (serviceRadiusKm !== undefined) worker.serviceRadiusKm = serviceRadiusKm;
-  if (location) worker.location = toPoint(location);
+
+  /* `baseArea` is the human-readable label for the same fact as `location`, and
+     it is what the worker's own panel and the customer search both display. It
+     has to move with the coordinates or the two disagree — the panel saying
+     "within 12 km of Bandra West" while dispatch matches from Malad. */
+  if (location) {
+    worker.location = toPoint(location);
+    worker.baseArea = nearestArea(location.lat, location.lng)?.zone ?? worker.baseArea;
+  }
 
   await worker.save();
   return ok(res, { availability: worker.availability, location: worker.location, serviceRadiusKm: worker.serviceRadiusKm });

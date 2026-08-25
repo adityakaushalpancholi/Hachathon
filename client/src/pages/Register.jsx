@@ -5,7 +5,7 @@ import Logo from '../components/Logo.jsx';
 import { Spinner } from '../components/UI.jsx';
 import { useAuth, HOME_FOR_ROLE } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
-import { cooperatives as coopApi, services as serviceApi } from '../api/index.js';
+import { cooperatives as coopApi, services as serviceApi, areas as areaApi } from '../api/index.js';
 import { inr } from '../lib/format.js';
 
 /**
@@ -28,9 +28,30 @@ export default function Register() {
     hourlyRate: '',
     experienceYears: '',
     city: 'Mumbai',
+    zone: '',
   });
   const [error, setError] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [serviceAreas, setServiceAreas] = useState([]);
+
+  /* The area list is what dispatch matches on, so signup offers exactly those
+     rather than a free-text city that the engine has never heard of. */
+  useEffect(() => {
+    let alive = true;
+    areaApi
+      .list()
+      .then((list) => {
+        if (!alive) return;
+        setServiceAreas(list);
+        setForm((f) => ({ ...f, zone: f.zone || list[0]?.zone || '' }));
+      })
+      .catch(() => {
+        /* leaving it empty falls back to the company location, as before */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
   const [busy, setBusy] = useState(false);
   const [coops, setCoops] = useState([]);
   const [skills, setSkills] = useState([]);
@@ -81,7 +102,13 @@ export default function Register() {
 
     if (role === 'worker') {
       Object.assign(payload, {
-        city: form.city,
+        city: baseArea?.city ?? form.city,
+        /* Without this the server falls back to the company's own coordinates,
+           which puts every new professional on the map at head office —
+           outside the radius of most customers actually near them. */
+        ...(baseArea
+          ? { location: { lat: baseArea.lat, lng: baseArea.lng }, city: baseArea.city }
+          : {}),
         ...(form.cooperativeId ? { cooperativeId: form.cooperativeId } : {}),
         ...(form.skillTags.length ? { skillTags: form.skillTags } : {}),
         ...(form.hourlyRate ? { hourlyRate: Number(form.hourlyRate) } : {}),
@@ -106,6 +133,7 @@ export default function Register() {
   };
 
   const selectedCoop = coops.find((c) => c._id === form.cooperativeId);
+  const baseArea = serviceAreas.find((a) => a.zone === form.zone);
   const err = (field) => fieldErrors[field];
 
   return (
@@ -257,8 +285,20 @@ export default function Register() {
                 <input id="exp" type="number" min="0" max="60" value={form.experienceYears} onChange={set('experienceYears')} className="input" />
               </div>
               <div>
-                <label htmlFor="city" className="label">City</label>
-                <input id="city" value={form.city} onChange={set('city')} className="input" />
+                <label htmlFor="basearea" className="label">Where you work</label>
+                <select
+                  id="basearea"
+                  value={form.zone}
+                  onChange={(e) => setForm((f) => ({ ...f, zone: e.target.value }))}
+                  className="select"
+                >
+                  {serviceAreas.length === 0 && <option value="">Loading…</option>}
+                  {serviceAreas.map((a) => (
+                    <option key={a.zone} value={a.zone}>
+                      {a.zone} · {a.city}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 

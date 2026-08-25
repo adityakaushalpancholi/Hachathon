@@ -135,8 +135,9 @@ export const register = asyncHandler(async (req, res) => {
         yearsExperience: extra.experienceYears ?? 1,
       })),
       location,
-      // New members start unverified — the cooperative admin reviews documents
-      // before they can take a job.
+      baseArea: nearestArea(location.coordinates[1], location.coordinates[0])?.zone,
+      // A new professional starts unverified — an administrator reviews the
+      // documents before they can take a job.
       verification: { status: VERIFICATION_STATUS.PENDING },
     });
 

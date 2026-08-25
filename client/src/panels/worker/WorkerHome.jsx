@@ -11,6 +11,7 @@ import {
 import { inr, pct, formatDateTime, relativeTime } from '../../lib/format.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import WorkArea from './WorkArea.jsx';
 import { useState } from 'react';
 import OfferCard from './OfferCard.jsx';
 import ActiveJobCard from './ActiveJobCard.jsx';
@@ -97,6 +98,7 @@ export default function WorkerHome() {
   const toast = useToast();
   const { refresh } = useAuth();
   const [toggling, setToggling] = useState(false);
+  const [showArea, setShowArea] = useState(false);
 
   // Offers expire on a timer, so this panel polls faster than the others.
   const { data, loading, error, reload } = useApi(() => workerPanel.dashboard(), [], {
@@ -187,6 +189,14 @@ export default function WorkerHome() {
                     ? `Taking offers within ${profile.serviceRadiusKm} km of ${profile.baseArea}`
                     : 'Go online to start receiving job offers.'}
                 </p>
+                {online && (
+                  <button
+                    onClick={() => setShowArea((v) => !v)}
+                    className="mt-1 text-xs font-semibold text-coop-800 underline underline-offset-2"
+                  >
+                    {showArea ? 'Hide work area' : 'Not getting offers? Check your work area'}
+                  </button>
+                )}
               </div>
 
               <button
@@ -199,6 +209,11 @@ export default function WorkerHome() {
               </button>
             </div>
           </div>
+
+          {/* ---------------------------- work area --------------------------- */}
+          {showArea && (
+            <WorkArea profile={profile} onSaved={() => reload({ silent: true })} />
+          )}
 
           {/* --------------------------- today's target ----------------------- */}
           <section>
