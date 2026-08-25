@@ -38,6 +38,11 @@ export const workers = {
   nearby: (params) => http.get('/workers/nearby', { params, auth: false }),
 };
 
+/** Where the service operates. Public — the address form needs it before sign-in. */
+export const areas = {
+  list: () => http.get('/areas', { auth: false }),
+};
+
 export const cooperatives = {
   list: (params) => http.get('/cooperatives', { params, auth: false }),
   get: (id) => http.get(`/cooperatives/${id}`, { auth: false }),

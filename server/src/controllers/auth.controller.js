@@ -5,6 +5,7 @@ import { signToken } from '../middleware/auth.js';
 import { ROLES, VERIFICATION_STATUS } from '../config/constants.js';
 import { membershipId } from '../utils/ids.js';
 import { toPoint } from '../utils/geo.js';
+import { nearestArea } from '../config/areas.js';
 import { entitledRole, reconcileRole, isOwnerPhone } from '../services/owner.service.js';
 import { assessPassword } from '../services/password.service.js';
 
@@ -245,9 +246,18 @@ export const addAddress = asyncHandler(async (req, res) => {
 
   if (isDefault) req.user.addresses.forEach((a) => (a.isDefault = false));
 
+  /* An address captured by GPS arrives with coordinates but no zone, and the
+     zone is what demand forecasting buckets on. Fill it from the nearest
+     serviceable area rather than leaving the bucket empty — a booking with no
+     zone is invisible to every planning screen in the admin panel. */
+  const area = rest.zone ? null : nearestArea(location.lat, location.lng);
+
   req.user.addresses.push({
     ...rest,
+    zone: rest.zone || area?.zone,
+    city: rest.city || area?.city,
     location: toPoint(location),
+    // The first address a customer saves is their default, whatever they ticked.
     isDefault: isDefault ?? req.user.addresses.length === 0,
   });
   await req.user.save();

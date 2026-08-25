@@ -7,6 +7,7 @@ import { Async, SectionHeader, ChipRow, EmptyState, Avatar, RatingStars } from '
 import WorkerCard from '../../components/WorkerCard.jsx';
 import { inr, km } from '../../lib/format.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import AddressForm from '../../components/AddressForm.jsx';
 
 const RADII = [3, 5, 8, 15, 25];
 
@@ -41,18 +42,20 @@ export default function Nearby() {
 
   if (!home) {
     return (
-      <EmptyState
-        icon={MapPin}
-        title="No address on file"
-        hint="Add a service address to see which professionals are working near you."
-      />
+      <div className="mx-auto max-w-2xl space-y-5">
+        <SectionHeader
+          title="Add an address"
+          hint="Once we know where you are, this page shows who is working nearby right now."
+        />
+        <AddressForm />
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
       <SectionHeader
-        title="Members near you"
+        title="Professionals near you"
         hint={`Live positions around ${home.zone ?? home.city}. Updates every 25 seconds.`}
       />
 

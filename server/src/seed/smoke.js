@@ -189,6 +189,74 @@ async function main() {
   check('a customer is refused the database panel (403)', nonOwnerToDb.status === 403, nonOwnerToDb);
   check('the database panel refuses anonymous callers (401)', (await api('GET', '/database')).status === 401);
 
+  /* ------------------------------- addresses --------------------------- */
+  section('Service addresses');
+
+  const areas = await api('GET', '/areas');
+  check('serviceable areas are public', areas.status === 200 && areas.data?.length > 0, areas);
+  check(
+    'each area carries coordinates the form can use',
+    areas.data?.every((a) => typeof a.lat === 'number' && typeof a.lng === 'number' && a.zone),
+    areas.data?.[0],
+  );
+
+  const addrPhone = `93${String(Date.now()).slice(-8)}`;
+  const addrUser = await api('POST', '/auth/register', {
+    body: { name: 'Smoke Address', phone: addrPhone, password: 'Kestrel-9-Loom', role: 'customer' },
+  });
+  const addrToken = addrUser.data.token;
+
+  check('a new customer starts with no address', addrUser.data?.user?.addresses?.length === 0, addrUser.data?.user?.addresses);
+
+  const area0 = areas.data[0];
+  const saved = await api('POST', '/auth/addresses', {
+    token: addrToken,
+    body: {
+      label: 'Home',
+      line1: 'Flat 402, Sunrise Apartments',
+      city: area0.city,
+      pincode: area0.pincode,
+      zone: area0.zone,
+      location: { lat: area0.lat, lng: area0.lng },
+    },
+  });
+  check('a customer can save an address', saved.status === 201 && saved.data?.length === 1, saved);
+  check('the first address becomes the default', saved.data?.[0]?.isDefault === true, saved.data?.[0]);
+  check(
+    'coordinates are stored in GeoJSON order',
+    saved.data?.[0]?.location?.coordinates?.[0] === area0.lng &&
+      saved.data?.[0]?.location?.coordinates?.[1] === area0.lat,
+    saved.data?.[0]?.location,
+  );
+
+  /* An address captured by GPS carries no zone, and the zone is what demand
+     forecasting buckets on — so the server has to derive it. */
+  const gps = await api('POST', '/auth/addresses', {
+    token: addrToken,
+    body: {
+      label: 'Office',
+      line1: 'Hiranandani Gardens',
+      city: 'Mumbai',
+      location: { lat: 19.1176, lng: 72.9051 },
+    },
+  });
+  check('an address without a zone is bucketed by its coordinates', gps.data?.[1]?.zone === 'Powai', gps.data?.[1]);
+  check('a later address does not steal the default', gps.data?.[1]?.isDefault === false, gps.data?.[1]);
+
+  const badAddressGeo = await api('POST', '/auth/addresses', {
+    token: addrToken,
+    body: { label: 'Bad', line1: 'Nowhere', city: 'Mumbai', location: { lat: 999, lng: 999 } },
+  });
+  check('out-of-range coordinates are refused', badAddressGeo.status === 400, badAddressGeo);
+
+  const removed = await api('DELETE', `/auth/addresses/${gps.data[1]._id}`, { token: addrToken });
+  check('a customer can remove an address', removed.status === 200 && removed.data?.length === 1, removed);
+
+  check(
+    'addresses require a session',
+    (await api('POST', '/auth/addresses', { body: { line1: 'x' } })).status === 401,
+  );
+
   /* ------------------------------- payments ---------------------------- */
   section('Payments');
 

@@ -1,18 +1,12 @@
+import { SERVICE_AREAS } from '../config/areas.js';
 /**
  * Seed fixtures. Coordinates are real Mumbai localities so the geospatial
  * queries return believable distances rather than points on a grid.
  */
 
-export const ZONES = [
-  { zone: 'Andheri West', city: 'Mumbai', pincode: '400058', center: [72.8296, 19.1364] },
-  { zone: 'Bandra West', city: 'Mumbai', pincode: '400050', center: [72.8296, 19.0596] },
-  { zone: 'Powai', city: 'Mumbai', pincode: '400076', center: [72.9051, 19.1176] },
-  { zone: 'Dadar', city: 'Mumbai', pincode: '400028', center: [72.8420, 19.0176] },
-  { zone: 'Malad West', city: 'Mumbai', pincode: '400064', center: [72.8484, 19.1868] },
-  { zone: 'Chembur', city: 'Mumbai', pincode: '400071', center: [72.8998, 19.0522] },
-  { zone: 'Thane West', city: 'Thane', pincode: '400601', center: [72.9781, 19.2183] },
-  { zone: 'Goregaon East', city: 'Mumbai', pincode: '400063', center: [72.8656, 19.1663] },
-];
+/* The service area is operating config, not fixture data — see config/areas.js.
+   Re-exported under the old name so the seed reads the same list the API serves. */
+export const ZONES = SERVICE_AREAS;
 
 export const COOPERATIVES = [
   {

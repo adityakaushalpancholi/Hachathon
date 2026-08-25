@@ -15,6 +15,7 @@ import { validate } from '../middleware/validate.js';
 import { idParam } from '../validators/schemas.js';
 import { ok } from '../utils/respond.js';
 import { isEphemeral } from '../config/db.js';
+import { areasForClient } from '../config/areas.js';
 
 const router = Router();
 
@@ -49,6 +50,7 @@ router.get('/health', (_req, res) =>
  *   /insights       — demand analytics                 (any signed-in role)
  *   /reviews        — ratings                          (public read / customer write)
  *   /notifications  — per-user inbox                   (any signed-in role)
+ *   /areas          — serviceable areas + centres        (public)
  *   /cooperatives   — reference data                   (public)
  */
 router.use('/auth', authRoutes);
@@ -61,6 +63,13 @@ router.use('/admin', adminRoutes);
 router.use('/database', databaseRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/insights', insightsRoutes);
+
+/**
+ * Where the service operates. Public and unauthenticated because the address
+ * form needs it before anyone has signed in, and because it is not a secret —
+ * it is the answer to "do you cover my area?".
+ */
+router.get('/areas', (_req, res) => ok(res, areasForClient()));
 
 router.get('/cooperatives', listCooperatives);
 router.get('/cooperatives/:id', validate({ params: idParam }), getCooperative);

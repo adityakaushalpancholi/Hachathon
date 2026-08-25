@@ -6,12 +6,13 @@ import {
 } from 'lucide-react';
 import { bookings as bookingApi, services as serviceApi, workers as workerApi } from '../../api/index.js';
 import { useApi } from '../../hooks/useApi.js';
-import { Async, Avatar, RatingStars, Spinner, EmptyState } from '../../components/UI.jsx';
+import { Async, Avatar, RatingStars, Spinner, EmptyState, SectionHeader } from '../../components/UI.jsx';
 import { serviceIcon, tone } from '../../lib/icons.jsx';
 import { inr, mins, formatDate } from '../../lib/format.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import PriceBreakdown from './PriceBreakdown.jsx';
+import AddressForm from '../../components/AddressForm.jsx';
 
 const STEPS = ['Service', 'When & where', 'Confirm'];
 
@@ -163,13 +164,18 @@ export default function NewBooking() {
     }
   };
 
+  /* The address form is rendered here rather than linked to: this is the first
+     screen a new customer reaches, and bouncing them to settings to come back
+     afterwards loses whatever they were trying to book. */
   if (!user?.addresses?.length) {
     return (
-      <EmptyState
-        icon={MapPin}
-        title="Add an address first"
-        hint="We need a service location before we can find professionals near you."
-      />
+      <div className="mx-auto max-w-2xl space-y-5">
+        <SectionHeader
+          title="Where should we come?"
+          hint="We match you to whoever is nearest and free, so we need a location first. This is saved to your account — you only do it once."
+        />
+        <AddressForm />
+      </div>
     );
   }
 

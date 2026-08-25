@@ -1,7 +1,11 @@
 import { useState } from 'react';
-import { KeyRound, Lock, Eye, EyeOff, AlertCircle, ShieldCheck, User } from 'lucide-react';
+import {
+  KeyRound, Lock, Eye, EyeOff, AlertCircle, ShieldCheck, User, MapPin, Plus, Trash2, Star,
+} from 'lucide-react';
 import { SectionHeader, Spinner } from '../components/UI.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { auth as authApi } from '../api/index.js';
+import AddressForm from '../components/AddressForm.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatDateTime } from '../lib/format.js';
 
@@ -85,6 +89,105 @@ function PasswordField({ id, label, value, onChange, autoComplete, meter = false
   );
 }
 
+/**
+ * The customer's saved addresses.
+ *
+ * Lives on the account page because an address outlives any one booking, but
+ * the same form is also rendered inline wherever a missing address blocks
+ * something — a person who wants to book now should not have to go and find
+ * settings first.
+ */
+function AddressBook() {
+  const { user, refresh } = useAuth();
+  const toast = useToast();
+  const [adding, setAdding] = useState(false);
+  const [removing, setRemoving] = useState(null);
+
+  const addresses = user?.addresses ?? [];
+
+  const remove = async (id) => {
+    setRemoving(id);
+    try {
+      await authApi.deleteAddress(id);
+      await refresh();
+      toast.success('Address removed');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setRemoving(null);
+    }
+  };
+
+  return (
+    <section className="card-pad">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <MapPin size={17} className="text-navy-700" />
+          <h2 className="font-bold tracking-tight text-navy-900">Service addresses</h2>
+        </div>
+
+        {!adding && (
+          <button onClick={() => setAdding(true)} className="btn-outline btn-sm">
+            <Plus size={14} /> Add address
+          </button>
+        )}
+      </div>
+
+      <p className="muted mt-1.5 text-sm">
+        Where we send professionals. The default is pre-selected when you book.
+      </p>
+
+      {addresses.length > 0 && (
+        <ul className="mt-5 flex flex-col gap-2.5">
+          {addresses.map((a) => (
+            <li
+              key={a._id}
+              className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-navy-200 p-3.5"
+            >
+              <div className="min-w-0">
+                <p className="flex items-center gap-2 font-semibold text-navy-900">
+                  {a.label || 'Address'}
+                  {a.isDefault && (
+                    <span className="badge-coop">
+                      <Star size={10} /> Default
+                    </span>
+                  )}
+                </p>
+                <p className="mt-0.5 text-sm text-navy-600">{a.line1}</p>
+                {a.landmark && <p className="text-xs text-navy-500">{a.landmark}</p>}
+                <p className="mt-0.5 text-xs text-navy-500">
+                  {[a.zone, a.city, a.pincode].filter(Boolean).join(' · ')}
+                </p>
+              </div>
+
+              <button
+                onClick={() => remove(a._id)}
+                disabled={removing === a._id}
+                className="btn-ghost btn-sm text-red-700 disabled:opacity-40"
+                aria-label={`Remove ${a.label || 'address'}`}
+              >
+                {removing === a._id ? <Spinner size={14} /> : <Trash2 size={14} />} Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {addresses.length === 0 && !adding && (
+        <p className="mt-5 rounded-lg border border-dashed border-navy-300 p-5 text-center text-sm text-navy-500">
+          No addresses yet. You need one before you can book.
+        </p>
+      )}
+
+      {adding && (
+        <div className="mt-5 border-t border-navy-100 pt-5">
+          <AddressForm compact onSaved={() => setAdding(false)} onCancel={() => setAdding(false)} />
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function Account() {
   const { user, account, changePassword } = useAuth();
   const toast = useToast();
@@ -159,6 +262,9 @@ export default function Account() {
           </dl>
         </div>
       </section>
+
+      {/* ------------------------------ addresses ------------------------------ */}
+      <AddressBook />
 
       {/* ------------------------------- password ------------------------------ */}
       <section className="card-pad">
