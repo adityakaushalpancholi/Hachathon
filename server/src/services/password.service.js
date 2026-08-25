@@ -54,10 +54,22 @@ export function assessPassword(plain, context = {}) {
     problems.push('Use more than one repeated character.');
   }
 
+  /* Each word of the context is checked, not the whole string.
+     "Aditya Pancholi" as a full name never appears inside a password, so
+     comparing it whole would wave through `Aditya@2007` — which is precisely
+     the shape this rule exists to catch. Tokens shorter than four characters
+     are skipped: they collide with ordinary words too often to be evidence. */
   const lower = value.toLowerCase();
+  const flagged = new Set();
+
   for (const [label, raw] of Object.entries(context)) {
-    const term = String(raw ?? '').toLowerCase().trim();
-    if (term.length >= 4 && lower.includes(term)) {
+    const tokens = String(raw ?? '')
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length >= 4);
+
+    if (tokens.some((t) => lower.includes(t)) && !flagged.has(label)) {
+      flagged.add(label);
       problems.push(`Do not build it from your ${label}.`);
     }
   }
