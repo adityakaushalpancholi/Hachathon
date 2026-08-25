@@ -32,7 +32,7 @@ export default function PriceBreakdown({ quote, refreshing }) {
       label: `Demand pricing ×${surge.multiplier}`,
       value: p.surgeAmount,
       tone: 'saffron',
-      hint: `${surge.openDemand} open requests vs ${surge.availableSupply} available members`,
+      hint: `${surge.openDemand} open requests vs ${surge.availableSupply} available professionals`,
     },
     p.emergencySurcharge > 0 && {
       label: 'Emergency surcharge',
@@ -121,7 +121,7 @@ export default function PriceBreakdown({ quote, refreshing }) {
           <div className="flex items-baseline justify-between">
             <dt className="flex items-center gap-2 text-coop-900">
               <span className="h-2.5 w-2.5 rounded-sm bg-coop-600" />
-              To the member who does the work
+              To the professional who does the work
             </dt>
             <dd className="tnum font-bold text-coop-900">{inr(p.workerPayout)}</dd>
           </div>
@@ -129,7 +129,7 @@ export default function PriceBreakdown({ quote, refreshing }) {
           <div className="flex items-baseline justify-between">
             <dt className="flex items-center gap-2 text-coop-800">
               <span className="h-2.5 w-2.5 rounded-sm bg-navy-700" />
-              Cooperative ({pct(p.split.coopPct)})
+              Company ({pct(p.split.coopPct)})
             </dt>
             <dd className="tnum font-semibold text-coop-800">{inr(p.coopCommission)}</dd>
           </div>
@@ -146,7 +146,7 @@ export default function PriceBreakdown({ quote, refreshing }) {
         <p className="mt-3.5 flex items-start gap-2 border-t border-coop-200 pt-3 text-xs leading-relaxed text-coop-800">
           <Info size={13} className="mt-0.5 shrink-0" />
           <span>
-            Forty percent of the cooperative&rsquo;s share returns to members as a dividend at the
+            The split is fixed when you book and is not recalculated later, so what the
             end of the settlement period. On an investor-owned app, roughly {inr(Math.round(p.total * 0.25))}{' '}
             of this booking would leave as platform margin.
           </span>

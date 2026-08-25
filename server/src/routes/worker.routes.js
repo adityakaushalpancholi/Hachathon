@@ -7,7 +7,7 @@ import {
   listWorkersQuery,
   nearbyQuery,
   availabilitySchema,
-  otpSchema,
+  jobCodeSchema,
   cancelSchema,
   declineSchema,
   respondReviewSchema,
@@ -38,8 +38,8 @@ router.post('/me/offers/:id/decline', workerOnly, validate({ params: idParam, bo
 
 router.post('/me/jobs/:id/enroute', workerOnly, validate({ params: idParam }), ctrl.markEnroute);
 router.post('/me/jobs/:id/arrived', workerOnly, validate({ params: idParam }), ctrl.markArrived);
-router.post('/me/jobs/:id/start', workerOnly, validate({ params: idParam, body: otpSchema }), ctrl.start);
-router.post('/me/jobs/:id/complete', workerOnly, validate({ params: idParam, body: otpSchema }), ctrl.complete);
+router.post('/me/jobs/:id/start', workerOnly, validate({ params: idParam, body: jobCodeSchema }), ctrl.start);
+router.post('/me/jobs/:id/complete', workerOnly, validate({ params: idParam, body: jobCodeSchema }), ctrl.complete);
 router.post('/me/jobs/:id/cancel', workerOnly, validate({ params: idParam, body: cancelSchema }), ctrl.workerCancel);
 
 router.post('/me/reviews/:id/respond', workerOnly, validate({ params: idParam, body: respondReviewSchema }), ctrl.respondToReview);

@@ -14,11 +14,8 @@ export const auth = {
   register: (payload) => http.post('/auth/register', payload, { auth: false }),
   login: (phone, password) => http.post('/auth/login', { phone, password }, { auth: false }),
 
-  // One-time codes. `requestOtp` answers identically whether or not the number
-  // has an account, so nothing here reveals who is registered; `verifyOtp`
-  // creates the account on first use, which is why `name` is accepted.
-  requestOtp: (phone) => http.post('/auth/otp/request', { phone }, { auth: false }),
-  verifyOtp: (payload) => http.post('/auth/otp/verify', payload, { auth: false }),
+  // Requires the current password, so a borrowed session cannot lock the owner out.
+  changePassword: (payload) => http.post('/auth/password', payload),
 
   me: () => http.get('/auth/me'),
   updateProfile: (payload) => http.patch('/auth/me', payload),
@@ -130,6 +127,18 @@ export const admin = {
 /* Owner-only. Every route here is refused with 403 for an admin who is not on
    the deployment's OWNER_PHONES list, so the UI gate is a convenience, not the
    control.                                                                    */
+
+/**
+ * Razorpay. `config` is public so the client can decide whether to render a Pay
+ * button before anyone signs in; `verify` is what actually settles a booking,
+ * and the server checks the gateway's signature rather than trusting this call.
+ */
+export const payments = {
+  config: () => http.get('/payments/config', { auth: false }),
+  createOrder: (bookingId) => http.post('/payments/order', { bookingId }),
+  verify: (payload) => http.post('/payments/verify', payload),
+  forBooking: (id) => http.get(`/payments/booking/${id}`),
+};
 
 export const database = {
   overview: () => http.get('/database'),

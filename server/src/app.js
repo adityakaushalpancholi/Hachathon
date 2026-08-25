@@ -11,6 +11,7 @@ import { notFoundHandler, errorHandler } from './middleware/error.js';
 import { ApiError } from './utils/ApiError.js';
 import { generalLimiter } from './middleware/rateLimit.js';
 import { env, isProd } from './config/env.js';
+import { webhook as paymentWebhook } from './controllers/payment.controller.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -19,8 +20,62 @@ export function createApp() {
 
   app.set('trust proxy', 1);
 
-  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  /**
+   * Content Security Policy, written out rather than left on helmet's default.
+   *
+   * The default is `default-src 'self'`, which blocks Razorpay Checkout outright
+   * — and it blocks it silently, as a console error on a page that otherwise
+   * looks fine, which is a miserable thing to debug. Checkout needs to load its
+   * script, open its own iframe, and talk to the Razorpay API, so those three
+   * origins are named explicitly instead of loosening the policy generally.
+   *
+   * In development the policy is off: Vite serves modules over its own origin
+   * with an inline HMR runtime, and fighting that buys nothing locally.
+   */
+  const RAZORPAY_ORIGINS = ['https://checkout.razorpay.com', 'https://api.razorpay.com'];
+
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      // Checkout opens in an iframe that posts back to the opener.
+      crossOriginEmbedderPolicy: false,
+      contentSecurityPolicy: isProd
+        ? {
+            directives: {
+              defaultSrc: ["'self'"],
+              scriptSrc: ["'self'", ...RAZORPAY_ORIGINS],
+              // Tailwind ships a stylesheet, but Checkout injects inline styles.
+              styleSrc: ["'self'", "'unsafe-inline'"],
+              imgSrc: ["'self'", 'data:', 'https:'],
+              connectSrc: ["'self'", ...RAZORPAY_ORIGINS],
+              frameSrc: ["'self'", ...RAZORPAY_ORIGINS],
+              fontSrc: ["'self'", 'data:'],
+              objectSrc: ["'none'"],
+              baseUri: ["'self'"],
+              formAction: ["'self'"],
+              frameAncestors: ["'self'"],
+              upgradeInsecureRequests: [],
+            },
+          }
+        : false,
+    }),
+  );
   app.use(compression());
+
+  /**
+   * The gateway webhook is mounted before the JSON parser on purpose.
+   *
+   * Its signature is an HMAC over the exact bytes Razorpay sent. Parsing and
+   * re-serialising JSON does not round-trip byte-for-byte — key order, unicode
+   * escaping and number formatting can all shift — so a body that has been
+   * through `express.json()` will not verify. This route needs the raw Buffer.
+   */
+  app.post(
+    '/api/payments/webhook',
+    express.raw({ type: 'application/json', limit: '256kb' }),
+    paymentWebhook,
+  );
+
   app.use(express.json({ limit: '1mb' }));
   app.use(express.urlencoded({ extended: true }));
   app.use(morgan(isProd ? 'combined' : 'dev'));

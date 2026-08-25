@@ -75,36 +75,36 @@ export default function AdminOverview() {
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                       <p className="text-xs font-bold uppercase tracking-wider text-navy-400">
-                        Cooperative
+                        Company
                       </p>
                       <h1 className="mt-1 text-xl font-bold tracking-tight">
                         {data.cooperative.name}
                       </h1>
                       <p className="mt-0.5 text-sm text-navy-300">
                         {data.cooperative.code} · {data.cooperative.city} ·{' '}
-                        {num(data.cooperative.stats.memberCount)} members
+                        {num(data.cooperative.stats.memberCount)} professionals
                       </p>
                     </div>
 
                     <div className="text-right">
                       <p className="text-xs font-bold uppercase tracking-wider text-coop-400">
-                        Undistributed dividend pool
+                        Commission earned
                       </p>
                       <p className="tnum mt-1 text-3xl font-bold text-coop-400">
-                        {inr(data.cooperative.dividendPool)}
+                        {inr(data.cooperative.stats.commissionEarned)}
                       </p>
                       <p className="mt-0.5 text-xs text-navy-400">
-                        Ready to return to members at settlement
+                        Across {num(data.cooperative.stats.jobsCompleted)} completed jobs
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Governance parameters — set by member vote, not by us. */}
+                {/* The rates this company runs on. */}
                 <dl className="grid grid-cols-2 divide-navy-100 sm:grid-cols-4 sm:divide-x">
                   {[
                     { label: 'Commission', value: pct(data.cooperative.governance.commissionPct * 100) },
-                    { label: 'Returned as dividend', value: pct(data.cooperative.governance.dividendPoolPct * 100) },
+                    { label: 'Platform fee', value: pct(2) },
                     { label: 'Rate floor', value: `${inr(data.cooperative.governance.minHourlyRate)}/hr` },
                     { label: 'Surge ceiling', value: `×${data.cooperative.governance.surgeCeiling}` },
                   ].map((g) => (
@@ -123,7 +123,7 @@ export default function AdminOverview() {
             <section>
               <SectionHeader title="Workforce" />
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                <StatCard icon={Users} label="Members" value={num(data.workforce.members)} tone="navy" />
+                <StatCard icon={Users} label="Professionals" value={num(data.workforce.members)} tone="navy" />
                 <StatCard
                   icon={Activity}
                   label="Online now"
@@ -154,7 +154,7 @@ export default function AdminOverview() {
                 >
                   <ShieldAlert size={18} className="shrink-0 text-saffron-600" />
                   <p className="min-w-0 flex-1 text-sm font-semibold text-saffron-900">
-                    {data.workforce.pendingVerification} member
+                    {data.workforce.pendingVerification} professional
                     {data.workforce.pendingVerification === 1 ? '' : 's'} waiting on your decision
                   </p>
                   <ArrowRight size={15} className="shrink-0 text-saffron-500" />
@@ -195,7 +195,7 @@ export default function AdminOverview() {
 
                 <StatCard
                   icon={PiggyBank}
-                  label="Reached members"
+                  label="Reached professionals"
                   value={inrCompact(data.finance.workerPayout30d)}
                   sub={`${pct(data.finance.payoutSharePct)} of gross volume`}
                   tone="coop"
@@ -209,7 +209,7 @@ export default function AdminOverview() {
                 <div>
                   <h3 className="panel-title">Revenue split, last 14 days</h3>
                   <p className="muted mt-0.5">
-                    How each day&rsquo;s gross volume divided between members and the cooperative.
+                    How each day&rsquo;s gross volume divided between the professional and the company.
                   </p>
                 </div>
                 <button
@@ -229,7 +229,7 @@ export default function AdminOverview() {
                         <th>Date</th>
                         <th className="text-right">Jobs</th>
                         <th className="text-right">Gross</th>
-                        <th className="text-right">To members</th>
+                        <th className="text-right">To pro</th>
                         <th className="text-right">Commission</th>
                       </tr>
                     </thead>
@@ -252,8 +252,8 @@ export default function AdminOverview() {
                 <BarChart
                   data={trend}
                   series={[
-                    { key: 'workerPayout', label: 'To members', color: SERIES.workerPayout },
-                    { key: 'commission', label: 'Cooperative commission', color: SERIES.commission },
+                    { key: 'workerPayout', label: 'To professionals', color: SERIES.workerPayout },
+                    { key: 'commission', label: 'Company commission', color: SERIES.commission },
                   ]}
                   format={inr}
                   height={220}
@@ -265,8 +265,8 @@ export default function AdminOverview() {
             {/* ---------------------------- shortcuts --------------------------- */}
             <section className="grid gap-4 sm:grid-cols-3">
               {[
-                { to: '/admin/verification', icon: CheckCircle2, title: 'Verification queue', body: 'Approve, reject or suspend members' },
-                { to: '/admin/settlement', icon: Banknote, title: 'Run settlement', body: 'Pay members and distribute the dividend' },
+                { to: '/admin/verification', icon: CheckCircle2, title: 'Verification queue', body: 'Approve, reject or suspend professionals' },
+                { to: '/admin/settlement', icon: Banknote, title: 'Run settlement', body: 'Pay professionals for completed work' },
                 { to: '/admin/insights', icon: TrendingUp, title: 'Demand insights', body: 'Where to recruit and retrain' },
               ].map((c) => (
                 <Link key={c.to} to={c.to} className="card-pad transition hover:shadow-lift">

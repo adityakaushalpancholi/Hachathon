@@ -37,20 +37,21 @@ panel and is re-checked on every panel-scoped route.
 
 | Method | Path | Access | Purpose |
 |---|---|---|---|
-| POST | `/auth/register` | public | Create a customer or member account |
+| POST | `/auth/register` | public | Create a customer or professional account |
 | POST | `/auth/login` | public | Exchange phone + password for a token |
-| POST | `/auth/otp/request` | public | Send a one-time code to a number |
-| POST | `/auth/otp/verify` | public | Exchange phone + code for a token |
+| POST | `/auth/password` | auth | Change the password, proving the current one |
 | GET | `/auth/me` | auth | Rehydrate the session; returns `panel` |
 | PATCH | `/auth/me` | auth | Update name, email, language |
 | POST | `/auth/addresses` | auth | Add a service address |
 | DELETE | `/auth/addresses/:id` | auth | Remove one |
 
 `register` with `role: "worker"` also provisions a `Worker` profile attached to
-a cooperative, in `pending` verification.
+a company, in `pending` verification.
 
-Login and register are rate-limited to 20 attempts per 15 minutes, counting only
-failures.
+Credential endpoints are rate-limited to 20 attempts per 15 minutes, counting
+only failures, and keyed on the **phone number** rather than the caller's
+address — a shared mobile gateway puts thousands of legitimate users behind one
+IP, while an attacker working a single account rotates addresses freely.
 
 <details>
 <summary><code>POST /auth/login</code></summary>
@@ -70,12 +71,11 @@ failures.
       "role": "customer",
       "label": "Customer",
       "isOwner": false,
-      "phoneVerified": true,
       "hasPassword": true,
-      "signInMethods": ["otp", "password"],
       "membershipId": null,
       "memberSince": "2026-01-14T09:22:10.441Z",
-      "lastLoginAt": "2026-08-25T04:11:02.910Z"
+      "lastLoginAt": "2026-08-25T04:11:02.910Z",
+      "passwordChangedAt": "2026-01-14T09:22:10.441Z"
     },
     "isOwner": false,
     "workerProfile": null,        // populated for role=worker
@@ -84,47 +84,112 @@ failures.
 }
 ```
 
-`account` is the server's own description of the caller. The client renders it
-rather than deducing any of it — `signInMethods`, in particular, is why the sign-in
-screen never offers a password box to an account that has no password.
+`account` is the server's own description of the caller, and the client renders
+it rather than working any of it out for itself.
+
+**An unknown number and a wrong password return the same 401 and the same
+message.** Distinguishing them only helps someone establishing which numbers are
+registered; a person who owns the number already knows whether they signed up.
+The no-account branch also runs a throwaway bcrypt comparison so its response
+time does not answer the question the message refuses to.
+
+After five failed attempts the account itself locks, independently of the rate
+limiter, and each further round doubles the wait to a ceiling of an hour. The
+lock is capped rather than permanent because an account a stranger can disable
+forever is its own denial of service. A correct password clears the counter.
 </details>
 
 <details>
-<summary><code>POST /auth/otp/request</code> → <code>POST /auth/otp/verify</code></summary>
+<summary><code>POST /auth/password</code></summary>
 
 ```json
-{ "phone": "9812345678" }
+{ "currentPassword": "Kestrel-9-Loom", "newPassword": "Marram-7-Drift" }
+```
+
+Returns the same session shape as `/auth/login`, with a **freshly minted token**
+— the old one stays valid until it expires, so handing back a new one keeps the
+client from holding a session issued before the credential moved.
+
+The current password is required. A session alone is not enough, which is what
+stops a borrowed unlocked phone from becoming a permanent account takeover.
+
+The policy is deliberately short — at least 8 characters, a mix of letters and
+digits, not on the common-password list, and not built from the account's own
+name or number. Long composition rules push people toward `Passw0rd!`, which is
+predictable in exactly the way the rule was meant to prevent. Every failure is
+reported at once rather than one at a time.
+
+Hashes are bcrypt at cost 12. `passwordHash`, `failedLoginAttempts` and
+`lockedUntil` are all `select: false`, so a stray `User.find()` in some future
+controller cannot serialise them by accident.
+</details>
+
+---
+
+## Payments
+
+Razorpay. Absent keys mean payment is *unavailable* rather than half-working:
+the client hides the Pay button and bookings settle in cash on completion.
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| GET | `/payments/config` | public | Whether the gateway is usable, and the publishable key |
+| POST | `/payments/order` | auth | Open an order for a booking |
+| POST | `/payments/verify` | auth | Verify the signature and settle the booking |
+| POST | `/payments/webhook` | signature | Razorpay's own server-to-server callback |
+| GET | `/payments/booking/:id` | auth | Payment attempts against one booking |
+
+<details>
+<summary>How a payment is actually made safe</summary>
+
+```json
+{ "bookingId": "66f1c2..." }
 ```
 
 ```jsonc
 {
   "success": true,
   "data": {
-    "sent": true,
-    "phone": "9812345678",
-    "expiresInSec": 300,
-    "channel": "log",          // "log" until SMS_PROVIDER is configured
-    "devCode": "418205"        // only when OTP_ECHO=true, which prod refuses
+    "orderId": "order_PxYz...",
+    "amount": 59900,            // paise — the gateway counts in the smallest unit
+    "currency": "INR",
+    "keyId": "rzp_live_...",    // publishable; grants nothing on its own
+    "booking": { "id": "...", "code": "SS-8H2K9", "total": 599 },
+    "prefill": { "name": "Priya Sharma", "contact": "9876543210" }
   }
 }
 ```
 
-The response is **identical whether or not the number has an account**. That is
-deliberate: an endpoint that answers differently is a directory of who is
-registered.
+**The amount comes from the stored booking, never from the request body.** A
+client able to name its own price would be the entire vulnerability.
+
+Checkout then runs in the customer's browser and posts back three fields, all of
+which are attacker-controlled. What makes them trustworthy is the HMAC:
 
 ```json
-{ "phone": "9812345678", "code": "418205", "name": "Priya Sharma" }
+{
+  "razorpay_order_id": "order_PxYz...",
+  "razorpay_payment_id": "pay_PxYz...",
+  "razorpay_signature": "9ef1a2..."
+}
 ```
 
-Returns the same session shape as `/auth/login`, plus `isNew`. `name` is only
-used when the number has no account yet — verifying an unknown number creates
-one, which is why there is no separate registration step for customers.
+The server recomputes `HMAC-SHA256(order_id + "|" + payment_id)` with the key
+secret and compares it using `timingSafeEqual`, which keeps the comparison from
+leaking the expected value a byte at a time. Only then is the booking marked
+paid. A signature that does not verify records a failed payment rather than
+being silently ignored.
 
-Codes are stored as SHA-256 hashes, compared in constant time, expire via a TTL
-index, allow `OTP_MAX_ATTEMPTS` guesses before the code is burned, and are
-limited to 8 requests per hour **per phone number** rather than per IP — the
-number being targeted is what needs protecting, not the caller's address.
+`/payments/webhook` is mounted **before** the JSON body parser, because its
+signature covers the exact bytes Razorpay sent and JSON does not round-trip
+byte-for-byte — key order, unicode escaping and number formatting can all shift.
+It exists because the browser can be closed the instant after paying, making the
+redirect an unreliable notification; the webhook is the path guaranteed to
+arrive, which is why it is allowed to settle a booking on its own. A payment
+already marked paid is never walked backwards by a late or duplicated event.
+
+Abandoned orders (status `created`) self-delete after 24 hours via a partial TTL
+index. Settled and failed records are kept — those are financial history.
 </details>
 
 ---
@@ -141,7 +206,7 @@ number being targeted is what needs protecting, not the caller's address.
 | DELETE | `/database/:collection/:id` | owner | Delete one document |
 
 "Owner" is stricter than `role: admin` — the caller's number must be in
-`OWNER_PHONES`. An admin who runs a cooperative gets 403 here.
+`OWNER_PHONES`. An admin who is not on that list gets 403 here.
 
 Collections are addressed through an allowlist of registered models, never by the
 raw URL string, so this cannot be walked sideways into `system.*`. `passwordHash`
@@ -160,8 +225,8 @@ the models define.
 | GET | `/services/categories` | public | Category tiles with live counts |
 | GET | `/services/:id` | public | One service, its packages, and top members |
 | GET | `/services/:id/reviews` | public | Reviews for a service |
-| GET | `/cooperatives` | public | List cooperatives. `?city` |
-| GET | `/cooperatives/:id` | public | One cooperative and its governance |
+| GET | `/cooperatives` | public | List companies. `?city` |
+| GET | `/cooperatives/:id` | public | One company and its rates |
 
 ---
 
@@ -171,7 +236,7 @@ the models define.
 |---|---|---|---|
 | GET | `/workers` | public | List verified members. `?q&skillTag&city&minRating&sort&page&limit` |
 | GET | `/workers/nearby` | public | **Geospatial search**, ranked |
-| GET | `/workers/:id` | public | Profile, stats, reviews, cooperative |
+| GET | `/workers/:id` | public | Profile, stats, reviews, company |
 
 <details>
 <summary><code>GET /workers/nearby</code></summary>
@@ -199,7 +264,7 @@ pass returns nothing.
         "experience": 0.9,
         "fairness": 1              // boost for members below the local median
       },
-      "cooperativeName": "Mumbai Kaamgaar Sahakari Sanstha"
+      "cooperativeName": "Westline Home Services"
     }
   ],
   "meta": { "radiusKm": 8, "center": [72.8296, 19.0596], "count": 12 }
@@ -219,7 +284,7 @@ Results are ordered by `matchScore`, **not** by distance.
 | GET | `/bookings` | List own bookings. `?status&live&page&limit` |
 | POST | `/bookings/quote` | **Price without creating** — surge + full split |
 | POST | `/bookings` | Create a booking and trigger dispatch |
-| GET | `/bookings/:id` | Detail, including the start OTP |
+| GET | `/bookings/:id` | Detail, including the 4-digit start code |
 | GET | `/bookings/:id/track` | Lightweight tracking payload for polling |
 | POST | `/bookings/:id/cancel` | Cancel, with the fee ladder applied |
 | POST | `/bookings/:id/retry` | Re-dispatch a booking nobody took |
@@ -324,7 +389,7 @@ expired · `403` you were never offered this job.
 
 ## Admin panel · `role=admin`
 
-All routes are additionally scoped to the admin's own cooperative.
+All routes are additionally scoped to the admin's own company.
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -358,7 +423,7 @@ All routes are additionally scoped to the admin's own cooperative.
     "totals": {
       "members": 21, "jobs": 47,
       "gross": 63232, "commission": 5059,
-      "dividendPool": 2024,        // commission × the voted dividendPoolPct
+
       "payable": 58935
     },
     "lines": [
@@ -366,8 +431,7 @@ All routes are additionally scoped to the admin's own cooperative.
         "worker": "...", "jobs": 5,
         "gross": 15195, "coopCommission": 1216, "platformFee": 304,
         "earnings": 13675,
-        "contributionPct": 24,     // share of period gross → share of dividend
-        "dividendShare": 487,
+        "contributionPct": 24,     // this professional's share of period gross
         "net": 14162
       }
     ]
@@ -427,6 +491,6 @@ the legal moves in `details`.
 pending → dispatching → accepted → enroute → arrived → in_progress → completed
               │                                              ▲
               ├─→ expired ──→ dispatching (re-broadcast)     │
-              │                                     OTP gate ┘
+              │                               job-code gate ┘
               └─→ cancelled        (any pre-completion state may cancel)
 ```

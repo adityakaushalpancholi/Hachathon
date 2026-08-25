@@ -23,16 +23,17 @@ const cooperativeSchema = new mongoose.Schema(
     },
 
     /**
-     * Governance & economics. These are set by member vote, not by the platform,
-     * which is why they live on the cooperative rather than in global config.
+     * Per-company economics.
+     *
+     * These live on the company rather than in global config so different
+     * companies on the same deployment can run different rates — the global
+     * env values are only the default a new company starts from.
      */
     governance: {
       commissionPct: { type: Number, default: env.coopCommissionPct, min: 0, max: 0.3 },
-      dividendPoolPct: { type: Number, default: env.dividendPoolPct, min: 0, max: 1 },
-      // Collectively bargained rate floor — no member may be booked below this.
+      // No professional may be booked below this hourly rate.
       minHourlyRate: { type: Number, default: 180 },
       surgeCeiling: { type: Number, default: env.surgeMax },
-      lastGeneralBodyMeeting: { type: Date },
     },
 
     stats: {
@@ -41,11 +42,10 @@ const cooperativeSchema = new mongoose.Schema(
       jobsCompleted: { type: Number, default: 0 },
       grossVolume: { type: Number, default: 0 },
       commissionEarned: { type: Number, default: 0 },
-      dividendsDistributed: { type: Number, default: 0 },
       avgRating: { type: Number, default: 0 },
     },
 
-    // Skill-development programmes the coop runs for its members.
+    // Skill-development programmes the company runs for its professionals.
     trainingPrograms: [
       {
         name: { type: String, trim: true },
@@ -62,12 +62,6 @@ const cooperativeSchema = new mongoose.Schema(
 
 cooperativeSchema.index({ location: '2dsphere' });
 cooperativeSchema.index({ city: 1, isActive: 1 });
-
-/** Undistributed member dividend pool, in rupees. */
-cooperativeSchema.virtual('dividendPool').get(function () {
-  const pool = this.stats.commissionEarned * this.governance.dividendPoolPct;
-  return Math.max(0, Math.round(pool - this.stats.dividendsDistributed));
-});
 
 cooperativeSchema.set('toJSON', { virtuals: true });
 cooperativeSchema.set('toObject', { virtuals: true });

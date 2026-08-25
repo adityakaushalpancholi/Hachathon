@@ -71,7 +71,7 @@ export async function createBooking(customer, payload) {
     notes,
     couponCode,
     addOns = [],
-    paymentMethod = 'upi',
+    paymentMethod = 'cash',
     preferredWorkerId,
   } = payload;
 

@@ -51,7 +51,7 @@ export default function Insights() {
     <div className="space-y-8">
       <SectionHeader
         title="Demand insights"
-        hint="Computed from your booking history. Members can see the same picture — nothing here is a black box."
+        hint="Computed from your booking history. Professionals see the same picture — nothing here is a black box."
       />
 
       <ChipRow
@@ -161,8 +161,8 @@ export default function Insights() {
       <section className="card-pad">
         <h3 className="panel-title">Live demand pressure</h3>
         <p className="muted mb-5 mt-0.5">
-          The current multiplier per trade, with the open requests and available members that
-          produced it. Published openly — members see the same board.
+          The current multiplier per trade, with the open requests and available professionals
+          that produced it. Published openly — professionals see the same board.
         </p>
 
         <Async
@@ -178,7 +178,7 @@ export default function Insights() {
                 <tr>
                   <th>Trade</th>
                   <th className="text-right">Open requests</th>
-                  <th className="text-right">Members free</th>
+                  <th className="text-right">Pros free</th>
                   <th className="text-right">Multiplier</th>
                   <th>State</th>
                 </tr>
@@ -201,7 +201,7 @@ export default function Insights() {
                         }
                       >
                         {s.reason === 'no_supply'
-                          ? 'No members free'
+                          ? 'Nobody free'
                           : s.multiplier > 1
                             ? 'High demand'
                             : 'Normal'}
@@ -249,7 +249,7 @@ export default function Insights() {
                       <div className="shrink-0 rounded-lg bg-red-50 px-3.5 py-2 text-right">
                         <p className="tnum text-lg font-bold text-red-700">+{g.suggestedHires}</p>
                         <p className="text-[10px] font-bold uppercase tracking-wider text-red-600">
-                          members needed
+                          pros needed
                         </p>
                       </div>
                     )}
@@ -259,8 +259,8 @@ export default function Insights() {
                     {[
                       { label: 'Bookings (30d)', value: num(g.bookings30d) },
                       { label: 'Revenue', value: inrCompact(g.revenue30d) },
-                      { label: 'Verified members', value: `${g.online}/${g.workers} online` },
-                      { label: 'Load per member', value: g.loadPerWorker },
+                      { label: 'Verified pros', value: `${g.online}/${g.workers} online` },
+                      { label: 'Load per pro', value: g.loadPerWorker },
                       { label: 'Went unmatched', value: pct(g.unmatchedRate) },
                     ].map((f) => (
                       <div key={f.label}>

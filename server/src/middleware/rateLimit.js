@@ -13,41 +13,36 @@ export const generalLimiter = rateLimit({
   handler,
 });
 
-/** Credential endpoints get a far tighter budget. */
+/**
+ * Credential endpoints — sign-in, sign-up, password change.
+ *
+ * Keyed by phone number where the body carries one, falling back to the address.
+ * An IP-keyed limit is the wrong shape twice over: a shared mobile gateway puts
+ * thousands of legitimate users behind one address, while an attacker guessing
+ * at one account rotates addresses freely. The account under attack is what
+ * deserves the budget. Successful requests are not counted, so a person signing
+ * in correctly all day never meets the ceiling.
+ */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60_000,
   limit: 20,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   skipSuccessfulRequests: true,
-  handler,
+  keyGenerator: (req) => `auth:${req.body?.phone || req.ip}`,
+  handler: (_req, res) =>
+    fail(res, 429, 'Too many attempts for this account. Try again in a few minutes.'),
 });
 
 /**
- * Code requests, keyed by phone number rather than by IP.
- *
- * An IP-keyed limit is the wrong shape here twice over: a shared mobile gateway
- * puts thousands of legitimate users behind one address, while an attacker
- * pumping codes at one number rotates addresses freely. The number being
- * targeted is the thing worth protecting, so that is what we count.
+ * Order creation. Each one is a call out to the gateway, so this protects
+ * Razorpay's rate limits and our own bill as much as it protects the API.
  */
-export const otpRequestLimiter = rateLimit({
-  windowMs: 60 * 60_000,
-  limit: 8,
+export const paymentLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 10,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  keyGenerator: (req) => `otp:${req.body?.phone || req.ip}`,
-  handler: (_req, res) =>
-    fail(res, 429, 'Too many codes requested for this number. Try again in an hour.'),
-});
-
-/** Verification attempts. The per-code ceiling lives in otp.service.js. */
-export const otpVerifyLimiter = rateLimit({
-  windowMs: 15 * 60_000,
-  limit: 20,
-  standardHeaders: 'draft-7',
-  legacyHeaders: false,
-  keyGenerator: (req) => `otpv:${req.body?.phone || req.ip}`,
   handler,
 });
 

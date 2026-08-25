@@ -72,9 +72,7 @@ export const notifyPayout = (userId, payout) =>
   notify(userId, {
     type: NOTIFICATION_TYPE.PAYOUT,
     title: `Payout ₹${payout.net} for ${payout.period.label}`,
-    body: payout.dividendShare
-      ? `Includes ₹${payout.dividendShare} cooperative dividend`
-      : 'Settled to your registered bank account',
+    body: 'Settled to your registered bank account',
     data: { payoutId: String(payout._id) },
   });
 

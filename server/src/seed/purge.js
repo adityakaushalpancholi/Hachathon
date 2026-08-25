@@ -5,7 +5,7 @@ import {
   Review,
   Notification,
   Payout,
-  Otp,
+  Payment,
 } from '../models/index.js';
 import { logger } from '../utils/logger.js';
 
@@ -20,6 +20,12 @@ import { logger } from '../utils/logger.js';
  * hold that number.
  */
 const DEMO_MARKS = [
+  // Current fixtures.
+  { phone: '9876500001', email: 'anjali@westlinehome.in' },
+  { phone: '9876500002', email: 'vikram@northgatefacility.in' },
+  // Earlier fixtures, kept so a deployment seeded before the rename is still
+  // recognisable. Dropping these would strand exactly the databases this tool
+  // exists for.
   { phone: '9876500001', email: 'anjali@mumbaikaamgaar.coop' },
   { phone: '9876500002', email: 'vikram@thaneshramik.coop' },
 ];
@@ -34,7 +40,7 @@ const INVENTED = [
   ['reviews', Review],
   ['notifications', Notification],
   ['payouts', Payout],
-  ['login codes', Otp],
+  ['payments', Payment],
 ];
 
 /** Does this database still carry the demo seed's mark? */

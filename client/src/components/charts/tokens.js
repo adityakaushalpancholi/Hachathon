@@ -14,8 +14,8 @@ export const CATEGORICAL = ['#128551', '#c44b07', '#2563eb'];
 
 /** Semantic slots, so a series keeps its hue wherever it appears. */
 export const SERIES = {
-  workerPayout: '#128551', // green — money reaching the member
-  commission: '#c44b07', // orange — the cooperative's share
+  workerPayout: '#128551', // green — money reaching the professional
+  commission: '#c44b07', // orange — the company's share
   forecast: '#2563eb', // blue — projected, not actual
 };
 

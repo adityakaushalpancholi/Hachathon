@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import {
-  ArrowRight, ShieldCheck, Users, Vote, PiggyBank, Zap, Search, TrendingUp,
+  ArrowRight, ShieldCheck, Users, PiggyBank, Zap, Search, TrendingUp,
 } from 'lucide-react';
 import { services as serviceApi, cooperatives as coopApi } from '../api/index.js';
 import { useApi } from '../hooks/useApi.js';
@@ -9,31 +9,32 @@ import { Skeleton } from '../components/UI.jsx';
 import { inr, num } from '../lib/format.js';
 
 /**
- * The commission comparison is the argument the whole product rests on, so it
- * is stated with real numbers rather than adjectives.
+ * The payout split, stated with real numbers rather than adjectives. These are
+ * the same figures the pricing engine uses, so the landing page cannot drift
+ * from what a booking screen actually shows.
  */
 const SPLIT_DEMO = { total: 599, coopCommission: 48, platformFee: 12 };
 
 const PRINCIPLES = [
   {
-    icon: Users,
-    title: 'Members own it',
-    body: 'Every worker on ShramSetu is a shareholding member of a registered cooperative — not a contractor on someone else’s platform.',
-  },
-  {
-    icon: Vote,
-    title: 'Members set the rules',
-    body: 'Commission rate, the hourly rate floor and even the surge ceiling are voted on at the general body meeting, not set by a pricing team.',
+    icon: ShieldCheck,
+    title: 'Every professional is verified',
+    body: 'Identity documents and a background check are reviewed before anyone can accept their first job, and the badge on a profile means that review actually happened.',
   },
   {
     icon: PiggyBank,
-    title: 'Members share the surplus',
-    body: 'A fixed share of every rupee of commission goes back to members as a dividend, apportioned by the work they actually did.',
+    title: 'The price is the price',
+    body: 'Fixed-price packages with the scope written down. You see the total, and the split behind it, before you confirm — not an estimate that grows at the door.',
   },
   {
-    icon: ShieldCheck,
-    title: 'Members verify members',
-    body: 'Documents and background checks are reviewed by the cooperative’s own board, who carry the reputational risk of admitting someone.',
+    icon: Zap,
+    title: 'Matched in under a minute',
+    body: 'A job is offered to the nearest available professionals all at once rather than sitting in a queue. First to accept takes it, and you get their name and ETA immediately.',
+  },
+  {
+    icon: Users,
+    title: 'Most of it reaches the worker',
+    body: 'Ninety percent of what you pay goes to the person doing the job. The rest runs the platform and the company behind them, and every booking screen shows you which is which.',
   },
 ];
 
@@ -61,17 +62,17 @@ export default function Landing() {
         <div className="relative mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:py-24">
           <div className="max-w-3xl">
             <span className="badge border border-coop-700/60 bg-coop-900/40 text-coop-300">
-              <Users size={12} /> Cooperative owned · {num(totalMembers)} members
+              <ShieldCheck size={12} /> {num(totalMembers)} verified professionals
             </span>
 
             <h1 className="mt-5 text-4xl font-extrabold leading-[1.1] tracking-tight sm:text-5xl lg:text-6xl">
-              The people who do the work
-              <span className="block text-coop-400">own the platform.</span>
+              Home repairs, done properly.
+              <span className="block text-coop-400">Booked in under a minute.</span>
             </h1>
 
             <p className="mt-5 max-w-xl text-lg leading-relaxed text-navy-200">
-              Electricians, plumbers, cleaners and carpenters — verified by their own cooperative,
-              paid a rate they voted for, and sharing the surplus their labour creates.
+              Electricians, plumbers, cleaners and carpenters — identity-verified, fixed-price,
+              and matched to whoever is nearest and free right now.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
@@ -79,13 +80,13 @@ export default function Landing() {
                 <Search size={17} /> Find a service
               </Link>
               <Link to="/register" className="btn px-5 py-3 text-base text-white ring-1 ring-inset ring-navy-600 hover:bg-navy-900">
-                Join as a member <ArrowRight size={17} />
+                Work with us <ArrowRight size={17} />
               </Link>
             </div>
 
             <dl className="mt-12 grid max-w-lg grid-cols-3 gap-6 border-t border-navy-800 pt-7">
               {[
-                { label: 'Verified members', value: num(totalMembers) },
+                { label: 'Verified professionals', value: num(totalMembers) },
                 { label: 'Jobs completed', value: num(totalJobs) },
                 { label: 'Goes to the worker', value: '90%' },
               ].map((s) => (
@@ -109,9 +110,9 @@ export default function Landing() {
                 On a {inr(SPLIT_DEMO.total)} AC service, {inr(toWorkers)} reaches the technician.
               </h2>
               <p className="mt-4 leading-relaxed text-navy-600">
-                Investor-owned marketplaces take 20–30% of every booking. A cooperative takes 8%,
-                and 40% of even that comes back to members as a dividend. The difference is not
-                charity — it is what happens when the surplus has no outside shareholder to reach.
+                Most services apps take 20–30% of every booking and never show you the number.
+                We take 10% in total, and print the breakdown on the screen where you confirm,
+                so you can check the arithmetic yourself before you commit to anything.
               </p>
 
               <Link to="/browse" className="btn-primary mt-6">
@@ -145,14 +146,14 @@ export default function Landing() {
                     <div className="bg-navy-300" style={{ width: '2%' }} />
                   </div>
                   <p className="mt-1.5 text-[11px] text-navy-500">
-                    Worker · cooperative 8% (40% of it returned as dividend) · platform 2%
+                    Professional 90% · company 8% · platform 2%
                   </p>
                 </div>
 
                 <div>
                   <div className="mb-2 flex items-baseline justify-between">
                     <span className="text-xs font-bold uppercase tracking-wide text-navy-500">
-                      Typical investor-owned app
+                      Typical services app
                     </span>
                     <span className="tnum text-sm font-bold text-navy-500">
                       {inr(Math.round(SPLIT_DEMO.total * 0.75))} to the worker
@@ -167,7 +168,7 @@ export default function Landing() {
                     </div>
                   </div>
                   <p className="mt-1.5 text-[11px] text-navy-500">
-                    Commission leaves the local economy entirely.
+                    A quarter of the bill, and rarely itemised.
                   </p>
                 </div>
               </div>
@@ -208,10 +209,10 @@ export default function Landing() {
       <section className="bg-white">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:py-20">
           <h2 className="text-3xl font-bold tracking-tight text-navy-900">
-            What &ldquo;cooperative&rdquo; actually changes
+            What you actually get
           </h2>
           <p className="muted mt-2 max-w-2xl">
-            Four structural differences, each of which shows up somewhere in this product.
+            Four commitments, each of which shows up somewhere concrete in this product.
           </p>
 
           <div className="mt-10 grid gap-6 sm:grid-cols-2">
@@ -238,9 +239,9 @@ export default function Landing() {
           <ol className="mt-10 grid gap-8 md:grid-cols-4">
             {[
               { icon: Search, title: 'Pick a package', body: 'Fixed scope, fixed price, shown with the full payout split before you commit.' },
-              { icon: Zap, title: 'We offer it out', body: 'The job goes to the nearest available members at once. First to accept takes it.' },
+              { icon: Zap, title: 'We offer it out', body: 'The job goes to the nearest available professionals at once. First to accept takes it.' },
               { icon: ShieldCheck, title: 'Verify with a code', body: 'You read out a 4-digit code to start the job, and another to close it.' },
-              { icon: TrendingUp, title: 'Everyone gets paid', body: 'The member is paid instantly; the cooperative’s share funds the dividend pool.' },
+              { icon: TrendingUp, title: 'Everyone gets paid', body: 'Pay by card or UPI in the app, or in cash on completion. The professional is settled either way.' },
             ].map((step, i) => (
               <li key={step.title} className="relative">
                 <div className="flex items-center gap-3">
@@ -262,14 +263,14 @@ export default function Landing() {
         <div className="mx-auto flex max-w-7xl flex-col items-start gap-6 px-4 py-14 sm:px-6 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-              Skilled at a trade? Join a cooperative.
+              Skilled at a trade? Work with us.
             </h2>
             <p className="mt-2 max-w-lg text-navy-300">
-              Keep 90% of what you earn, vote on the rules, and share in the surplus.
+              Keep 90% of what you earn, choose your own hours, and get paid on a fixed weekly cycle.
             </p>
           </div>
           <Link to="/register" className="btn-coop shrink-0 px-5 py-3 text-base">
-            Become a member <ArrowRight size={17} />
+            Apply to join <ArrowRight size={17} />
           </Link>
         </div>
       </section>

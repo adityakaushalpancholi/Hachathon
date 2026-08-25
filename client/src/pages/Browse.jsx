@@ -58,17 +58,17 @@ export default function Browse() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-10">
       <SectionHeader
-        title={view === 'services' ? 'Services' : 'Our members'}
+        title={view === 'services' ? 'Services' : 'Our professionals'}
         hint={
           view === 'services'
-            ? 'Fixed-price packages delivered by verified cooperative members.'
-            : 'Every member here has been verified by their own cooperative board.'
+            ? 'Fixed-price packages delivered by verified professionals.'
+            : 'Every professional here has passed an identity and background check.'
         }
         action={
           <div className="flex rounded-lg border border-navy-200 bg-white p-0.5">
             {[
               { key: 'services', label: 'Services', icon: Grid3x3 },
-              { key: 'members', label: 'Members', icon: Users },
+              { key: 'members', label: 'Professionals', icon: Users },
             ].map((t) => (
               <button
                 key={t.key}
@@ -95,7 +95,7 @@ export default function Browse() {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder={view === 'services' ? 'Search services…' : 'Search members by name or area…'}
+              placeholder={view === 'services' ? 'Search services…' : 'Search professionals by name or area…'}
               className="input pl-10"
               aria-label="Search"
             />
@@ -159,7 +159,7 @@ export default function Browse() {
         <>
           <p className="muted mb-3">
             {state.data?.meta?.total ?? state.data?.length ?? 0}{' '}
-            {view === 'services' ? 'services' : 'members'}
+            {view === 'services' ? 'services' : 'professionals'}
           </p>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

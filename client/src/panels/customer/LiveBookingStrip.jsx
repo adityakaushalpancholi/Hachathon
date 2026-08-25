@@ -34,7 +34,7 @@ export default function LiveBookingStrip({ booking }) {
 
           <p className="mt-0.5 truncate text-xs text-navy-500">
             {matching
-              ? 'Offering the job to nearby members…'
+              ? 'Offering the job to nearby professionals…'
               : booking.worker?.displayName
                 ? `${booking.worker.displayName} · slot at ${formatTime(booking.scheduledFor)}`
                 : formatTime(booking.scheduledFor)}

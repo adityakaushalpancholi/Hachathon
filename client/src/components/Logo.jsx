@@ -37,7 +37,7 @@ export default function Logo({ to = '/', size = 32, showText = true, className =
             Shram<span className="text-coop-600">Setu</span>
           </span>
           <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-navy-400">
-            Worker owned
+            Home services
           </span>
         </span>
       )}

@@ -15,6 +15,7 @@ const Browse = lazy(() => import('./pages/Browse.jsx'));
 const ServiceDetail = lazy(() => import('./pages/ServiceDetail.jsx'));
 const WorkerProfile = lazy(() => import('./pages/WorkerProfile.jsx'));
 const NotFound = lazy(() => import('./pages/NotFound.jsx'));
+const Account = lazy(() => import('./pages/Account.jsx'));
 
 // Customer panel
 const CustomerHome = lazy(() => import('./panels/customer/CustomerHome.jsx'));
@@ -71,6 +72,7 @@ export default function App() {
           <Route path="bookings" element={<MyBookings />} />
           <Route path="booking/:id" element={<BookingTracker />} />
           <Route path="nearby" element={<Nearby />} />
+          <Route path="account" element={<Account />} />
         </Route>
 
         {/* ---------------------------- WORKER panel -------------------------- */}
@@ -86,6 +88,7 @@ export default function App() {
           <Route path="inbox" element={<JobInbox />} />
           <Route path="job/:id" element={<ActiveJob />} />
           <Route path="earnings" element={<Earnings />} />
+          <Route path="account" element={<Account />} />
         </Route>
 
         {/* ----------------------------- ADMIN panel -------------------------- */}
@@ -102,6 +105,7 @@ export default function App() {
           <Route path="operations" element={<Operations />} />
           <Route path="settlement" element={<Settlement />} />
           <Route path="insights" element={<Insights />} />
+          <Route path="account" element={<Account />} />
           {/* Owner-only in practice: every /api/database route is refused for an
               admin who is not on the deployment's owner list. */}
           <Route path="database" element={<DatabasePanel />} />

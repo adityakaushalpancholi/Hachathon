@@ -16,22 +16,20 @@ export const ZONES = [
 
 export const COOPERATIVES = [
   {
-    name: 'Mumbai Kaamgaar Sahakari Sanstha',
-    code: 'MKS',
-    registrationNo: 'MH/CO-OP/2019/04412',
+    name: 'Westline Home Services',
+    code: 'WHS',
+    registrationNo: 'U74999MH2019PTC044120',
     city: 'Mumbai',
     state: 'Maharashtra',
     foundedYear: 2019,
     about:
-      'A worker-owned cooperative of 400+ electricians, plumbers, carpenters and cleaners across the western suburbs. Members elect the board, set the rate floor and share the surplus.',
+      'Electricians, plumbers, carpenters and cleaners across the western suburbs, all identity-verified and background-checked before their first job.',
     location: { type: 'Point', coordinates: [72.8479, 19.0896] },
-    contact: { phone: '9820011223', email: 'board@mumbaikaamgaar.coop' },
+    contact: { phone: '9820011223', email: 'support@westlinehome.in' },
     governance: {
       commissionPct: 0.08,
-      dividendPoolPct: 0.4,
       minHourlyRate: 200,
       surgeCeiling: 1.6,
-      lastGeneralBodyMeeting: new Date('2026-06-14'),
     },
     trainingPrograms: [
       { name: 'Certified Home Wiring', skill: 'electrician', durationHours: 40, certified: true },
@@ -40,22 +38,20 @@ export const COOPERATIVES = [
     ],
   },
   {
-    name: 'Thane Shramik Seva Cooperative',
-    code: 'TSS',
-    registrationNo: 'MH/CO-OP/2021/07731',
+    name: 'Northgate Facility Care',
+    code: 'NFC',
+    registrationNo: 'U74999MH2021PTC077310',
     city: 'Thane',
     state: 'Maharashtra',
     foundedYear: 2021,
     about:
-      'Founded by 30 domestic workers in Thane, now a multi-trade cooperative running its own skills academy and a members welfare fund.',
+      'A multi-trade home-services company operating across Thane, running its own skills academy and an in-house quality audit on every job.',
     location: { type: 'Point', coordinates: [72.9781, 19.2183] },
-    contact: { phone: '9930044556', email: 'contact@thaneshramik.coop' },
+    contact: { phone: '9930044556', email: 'care@northgatefacility.in' },
     governance: {
       commissionPct: 0.07,
-      dividendPoolPct: 0.45,
       minHourlyRate: 180,
       surgeCeiling: 1.5,
-      lastGeneralBodyMeeting: new Date('2026-07-02'),
     },
     trainingPrograms: [
       { name: 'Deep Cleaning Certification', skill: 'cleaner', durationHours: 16, certified: true },

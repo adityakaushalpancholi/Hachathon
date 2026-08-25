@@ -170,7 +170,7 @@ export default function ActiveJobCard({ job, onChanged }) {
         size="sm"
       >
         <p className="muted mb-4">
-          The customer will be told and the job goes back out to other members. Frequent
+          The customer will be told and the job goes back out to other professionals. Frequent
           cancellations affect your standing in the cooperative.
         </p>
         <div className="space-y-2">

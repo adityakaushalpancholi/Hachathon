@@ -21,7 +21,7 @@ export default function Earnings() {
     <div className="mx-auto max-w-4xl space-y-8">
       <SectionHeader
         title="Earnings"
-        hint="What you have made, what is owed to you, and your share of the cooperative surplus."
+        hint="What you have made, what is owed to you, and when it settles."
       />
 
       <Async
@@ -57,9 +57,9 @@ export default function Earnings() {
               />
               <StatCard
                 icon={PiggyBank}
-                label="Dividends received"
-                value={inr(data.dividendsReceived)}
-                sub="Your share of the surplus"
+                label="Paid to date"
+                value={inr(data.totalPaid ?? 0)}
+                sub="Settled to your bank"
                 tone="coop"
               />
             </div>
@@ -116,7 +116,7 @@ export default function Earnings() {
             <section>
               <SectionHeader
                 title="Settlements"
-                hint="Each run pays your job earnings plus your share of the cooperative's dividend pool."
+                hint="One run per week, covering every job you completed in the period."
               />
 
               {data.payouts?.length ? (
@@ -127,7 +127,6 @@ export default function Earnings() {
                         <th>Period</th>
                         <th className="text-right">Jobs</th>
                         <th className="text-right">Earnings</th>
-                        <th className="text-right">Dividend</th>
                         <th className="text-right">Net</th>
                         <th>Status</th>
                       </tr>
@@ -137,10 +136,7 @@ export default function Earnings() {
                         <tr key={p._id}>
                           <td className="font-mono text-xs">{p.period.label}</td>
                           <td className="tnum text-right">{p.bookings?.length ?? 0}</td>
-                          <td className="tnum text-right">{inr(p.net - p.dividendShare)}</td>
-                          <td className="tnum text-right font-semibold text-coop-700">
-                            +{inr(p.dividendShare)}
-                          </td>
+                          <td className="tnum text-right">{inr(p.gross ?? p.net)}</td>
                           <td className="tnum text-right font-bold">{inr(p.net)}</td>
                           <td>
                             <span
@@ -164,7 +160,7 @@ export default function Earnings() {
                 <EmptyState
                   icon={Banknote}
                   title="No settlements yet"
-                  hint="Your first payout appears after the cooperative runs its next settlement cycle."
+                  hint="Your first payout appears after the next weekly settlement run."
                 />
               )}
             </section>
@@ -173,12 +169,12 @@ export default function Earnings() {
               <div className="flex items-start gap-3.5">
                 <PiggyBank size={20} className="mt-0.5 shrink-0 text-coop-700" />
                 <div>
-                  <p className="font-bold text-coop-900">Why there is a dividend line</p>
+                  <p className="font-bold text-coop-900">How your payout is worked out</p>
                   <p className="mt-1 text-sm leading-relaxed text-coop-800">
-                    The commission your bookings pay does not leave the cooperative. A fixed share
-                    of it — set by member vote — is pooled and paid back out at settlement, in
-                    proportion to the work each member actually did. On an investor-owned platform
-                    that money is margin; here it is yours.
+                    Each job&rsquo;s split is fixed the moment it is booked — 90% to you, 8%
+                    commission, 2% platform fee — and never recalculated afterwards. A later change
+                    to the commission rate cannot reach back and change what you were already told
+                    you would earn. Settlement simply adds up the jobs you finished.
                   </p>
                 </div>
               </div>

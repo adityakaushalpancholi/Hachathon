@@ -12,9 +12,9 @@ import { inr } from '../lib/format.js';
  * Sign-up.
  *
  * Choosing "member" is not a cosmetic switch: it provisions a Worker profile
- * attached to a cooperative, in `pending` verification, which is exactly the
+ * attached to a company, in `pending` verification, which is exactly the
  * state the admin panel's queue exists to clear. Admin accounts are not
- * self-serve — a board seat is granted by the cooperative.
+ * self-serve — admin comes from the deployment's own configuration.
  */
 export default function Register() {
   const [role, setRole] = useState('customer');
@@ -39,7 +39,7 @@ export default function Register() {
   const toast = useToast();
   const navigate = useNavigate();
 
-  // Reference data for the member form.
+  // Reference data for the professional form.
   useEffect(() => {
     if (role !== 'worker') return;
     Promise.all([coopApi.list(), serviceApi.list({ limit: 50 })])
@@ -49,7 +49,7 @@ export default function Register() {
         setForm((f) => ({ ...f, cooperativeId: f.cooperativeId || c[0]?._id || '' }));
       })
       .catch(() => {
-        /* the form still submits; the server picks a cooperative by city */
+        /* the form still submits; the server picks a company by city */
       });
   }, [role]);
 
@@ -93,7 +93,7 @@ export default function Register() {
       const session = await register(payload);
       toast.success(
         role === 'worker'
-          ? 'Welcome. Your cooperative will review your documents before you can take jobs.'
+          ? 'Welcome. We will review your documents before you can take jobs.'
           : `Welcome to ShramSetu, ${session.user.name.split(' ')[0]}`,
       );
       navigate(HOME_FOR_ROLE[session.panel] ?? '/app', { replace: true });
@@ -124,13 +124,13 @@ export default function Register() {
             key: 'customer',
             icon: UserRound,
             title: 'I need a service',
-            blurb: 'Book verified members',
+            blurb: 'Book verified pros',
           },
           {
             key: 'worker',
             icon: Wrench,
             title: 'I do the work',
-            blurb: 'Join a cooperative',
+            blurb: 'Take bookings',
           },
         ].map((opt) => (
           <button
@@ -201,9 +201,9 @@ export default function Register() {
             <p className="text-sm font-bold text-coop-900">Membership details</p>
 
             <div>
-              <label htmlFor="coop" className="label">Cooperative to join</label>
+              <label htmlFor="coop" className="label">Company to join</label>
               <select id="coop" value={form.cooperativeId} onChange={set('cooperativeId')} className="select">
-                {coops.length === 0 && <option value="">Nearest cooperative</option>}
+                {coops.length === 0 && <option value="">Nearest company</option>}
                 {coops.map((c) => (
                   <option key={c._id} value={c._id}>
                     {c.name} — {c.city} ({c.stats.memberCount} members)
@@ -213,8 +213,8 @@ export default function Register() {
               {selectedCoop && (
                 <p className="mt-1.5 text-xs text-coop-800">
                   {Math.round(selectedCoop.governance.commissionPct * 100)}% commission · rate floor{' '}
-                  {inr(selectedCoop.governance.minHourlyRate)}/hr · {Math.round(selectedCoop.governance.dividendPoolPct * 100)}% of
-                  commission returned as dividend
+                  Rate floor {inr(selectedCoop.governance.minHourlyRate)}/hr ·{' '}
+                  {Math.round(selectedCoop.governance.commissionPct * 100)}% commission
                 </p>
               )}
             </div>
@@ -263,9 +263,9 @@ export default function Register() {
             </div>
 
             <p className="border-t border-coop-200 pt-3 text-xs leading-relaxed text-coop-800">
-              You will join as <strong>pending</strong>. A member of your cooperative&rsquo;s board
-              reviews your documents before you can go online and take jobs — members verify
-              members, not an outside company.
+              You will join as <strong>pending</strong>. An administrator
+              reviews your documents before you can go online and take jobs. A person reads
+              every file; this is not an automated check.
             </p>
           </div>
         )}

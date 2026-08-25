@@ -2,12 +2,11 @@ import { Router } from 'express';
 import * as ctrl from '../controllers/auth.controller.js';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
-import { authLimiter, otpRequestLimiter, otpVerifyLimiter } from '../middleware/rateLimit.js';
+import { authLimiter } from '../middleware/rateLimit.js';
 import {
   registerSchema,
   loginSchema,
-  otpRequestSchema,
-  otpVerifySchema,
+  changePasswordSchema,
   updateProfileSchema,
   addAddressSchema,
   idParam,
@@ -18,10 +17,15 @@ const router = Router();
 router.post('/register', authLimiter, validate({ body: registerSchema }), ctrl.register);
 router.post('/login', authLimiter, validate({ body: loginSchema }), ctrl.login);
 
-// Phone-first sign-in. `verify` both logs in and registers, so a new number
-// needs no separate sign-up step.
-router.post('/otp/request', otpRequestLimiter, validate({ body: otpRequestSchema }), ctrl.requestOtp);
-router.post('/otp/verify', otpVerifyLimiter, validate({ body: otpVerifySchema }), ctrl.verifyOtpLogin);
+// Changing a credential is a credential operation, so it shares the tight
+// budget rather than the general one.
+router.post(
+  '/password',
+  authLimiter,
+  requireAuth,
+  validate({ body: changePasswordSchema }),
+  ctrl.changePassword,
+);
 
 // `/me` is what the client calls on boot to learn which panel it may mount.
 router.get('/me', requireAuth, ctrl.me);

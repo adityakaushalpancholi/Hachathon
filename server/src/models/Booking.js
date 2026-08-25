@@ -92,7 +92,7 @@ const bookingSchema = new mongoose.Schema(
     },
 
     payment: {
-      method: { type: String, enum: Object.values(PAYMENT_METHOD), default: PAYMENT_METHOD.UPI },
+      method: { type: String, enum: Object.values(PAYMENT_METHOD), default: PAYMENT_METHOD.CASH },
       status: { type: String, enum: Object.values(PAYMENT_STATUS), default: PAYMENT_STATUS.PENDING },
       txnId: { type: String },
       paidAt: { type: Date },

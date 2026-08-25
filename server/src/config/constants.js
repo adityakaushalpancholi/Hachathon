@@ -65,14 +65,16 @@ export const BOOKING_TYPE = Object.freeze({
 });
 
 export const PAYMENT_METHOD = Object.freeze({
-  UPI: 'upi',
-  CARD: 'card',
+  RAZORPAY: 'razorpay', // card / UPI / netbanking, collected by the gateway
   CASH: 'cash',
   WALLET: 'wallet',
 });
 
 export const PAYMENT_STATUS = Object.freeze({
+  /** No payment attempt yet — the default for a fresh booking. */
   PENDING: 'pending',
+  /** An order exists at the gateway; the customer has not finished paying. */
+  CREATED: 'created',
   PAID: 'paid',
   REFUNDED: 'refunded',
   FAILED: 'failed',

@@ -5,7 +5,7 @@ import Logo from '../components/Logo.jsx';
 
 const LINKS = [
   { to: '/browse', label: 'Services' },
-  { to: '/browse?view=members', label: 'Our members' },
+  { to: '/browse?view=members', label: 'Our professionals' },
 ];
 
 /**
@@ -96,8 +96,8 @@ export default function PublicLayout() {
               </span>
             </div>
             <p className="max-w-sm text-sm leading-relaxed">
-              A service marketplace owned by the people who do the work. Members elect the board,
-              set the rate floor, and share the surplus the platform generates.
+              Verified electricians, plumbers, cleaners and carpenters at a fixed price.
+              Professionals choose their own hours and keep 90% of what they earn.
             </p>
           </div>
 
@@ -105,7 +105,7 @@ export default function PublicLayout() {
             <p className="mb-3 text-xs font-bold uppercase tracking-wider text-white">Platform</p>
             <ul className="space-y-2 text-sm">
               <li><Link to="/browse" className="hover:text-white">Browse services</Link></li>
-              <li><Link to="/register" className="hover:text-white">Join as a member</Link></li>
+              <li><Link to="/register" className="hover:text-white">Work with us</Link></li>
               <li><Link to="/login" className="hover:text-white">Sign in</Link></li>
             </ul>
           </div>
@@ -116,15 +116,15 @@ export default function PublicLayout() {
             </p>
             <ul className="space-y-2 text-sm">
               <li>8% commission, not 25%</li>
-              <li>Surplus returned as dividend</li>
-              <li>Collectively set rate floor</li>
-              <li>Members verify members</li>
+              <li>Transparent payout split</li>
+              <li>Fixed prices, no haggling</li>
+              <li>Every professional verified</li>
             </ul>
           </div>
         </div>
 
         <div className="border-t border-navy-800 px-4 py-5 text-center text-xs text-navy-400 sm:px-6">
-          &copy; {new Date().getFullYear()} ShramSetu · owned and governed by its members.
+          &copy; {new Date().getFullYear()} ShramSetu. All rights reserved.
         </div>
       </footer>
     </div>

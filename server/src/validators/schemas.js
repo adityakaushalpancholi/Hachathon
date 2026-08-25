@@ -7,6 +7,7 @@ import {
   LANGUAGES,
   ROLES,
 } from '../config/constants.js';
+import { PASSWORD_MIN, PASSWORD_MAX } from '../services/password.service.js';
 
 const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/, 'must be a valid id');
 const phone = z.string().regex(/^[6-9]\d{9}$/, 'must be a 10-digit Indian mobile number');
@@ -38,7 +39,7 @@ export const registerSchema = z.object({
   name: z.string().min(2).max(80),
   phone,
   email: z.string().email().optional(),
-  password: z.string().min(6, 'password must be at least 6 characters').max(72),
+  password: z.string().min(PASSWORD_MIN).max(PASSWORD_MAX),
   role: z.enum([ROLES.CUSTOMER, ROLES.WORKER]).default(ROLES.CUSTOMER),
   language: z.enum(LANGUAGES).optional(),
   // Worker sign-up extras
@@ -55,13 +56,18 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'password is required'),
 });
 
-export const otpRequestSchema = z.object({ phone });
+export const createOrderSchema = z.object({ bookingId: objectId });
 
-export const otpVerifySchema = z.object({
-  phone,
-  code: z.string().regex(/^\d{4,8}$/, 'code must be the digits sent to your phone'),
-  // Consulted only when the code registers a brand-new number.
-  name: z.string().min(2).max(80).optional(),
+/** Exactly the three fields Razorpay Checkout hands back on success. */
+export const verifyPaymentSchema = z.object({
+  razorpay_order_id: z.string().min(4).max(60),
+  razorpay_payment_id: z.string().min(4).max(60),
+  razorpay_signature: z.string().min(16).max(200),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'your current password is required'),
+  newPassword: z.string().min(PASSWORD_MIN).max(PASSWORD_MAX),
 });
 
 export const updateProfileSchema = z.object({
@@ -143,7 +149,7 @@ export const createBookingSchema = z.object({
   notes: z.string().max(500).optional(),
   couponCode: z.string().max(20).optional(),
   addOns: z.array(z.object({ name: z.string(), price: z.number().min(0) })).default([]),
-  paymentMethod: z.enum(Object.values(PAYMENT_METHOD)).default(PAYMENT_METHOD.UPI),
+  paymentMethod: z.enum(Object.values(PAYMENT_METHOD)).default(PAYMENT_METHOD.CASH),
   preferredWorkerId: objectId.optional(),
 });
 
@@ -154,7 +160,8 @@ export const listBookingsQuery = z.object({
   limit: coerceNum(z.number().int().min(1).max(50)).default(20),
 });
 
-export const otpSchema = z.object({
+/** The code a customer reads out to start or close a job — not a sign-in code. */
+export const jobCodeSchema = z.object({
   code: z.string().regex(/^\d{4}$/, 'code must be 4 digits'),
 });
 

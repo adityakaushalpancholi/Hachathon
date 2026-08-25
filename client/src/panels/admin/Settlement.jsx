@@ -11,9 +11,9 @@ import { useToast } from '../../context/ToastContext.jsx';
 /**
  * Settlement.
  *
- * Two components make up a member's payout: their job earnings (already net of
- * commission), and their share of the dividend pool. The dividend is apportioned
- * by contribution — each member's share of the period's gross — which is the rule
+ * A payout is the sum of the `workerPayout` line from every booking the
+ * professional completed in the period — already net of commission and platform
+ * fee, because the split is computed once at booking time and never recomputed
  * the general body voted for, and the reason this screen shows a contribution
  * percentage next to every line.
  */
@@ -54,7 +54,7 @@ export default function Settlement() {
   const approve = async (payout) => {
     try {
       await adminApi.approvePayout(payout._id);
-      toast.success(`Paid ${inr(payout.net)} to the member`);
+      toast.success(`Paid ${inr(payout.net)} to the professional`);
       reload({ silent: true });
     } catch (err) {
       toast.error(err.message);
@@ -65,7 +65,7 @@ export default function Settlement() {
     <div className="space-y-8">
       <SectionHeader
         title="Settlement"
-        hint="Pay members their earnings and distribute the cooperative's dividend pool."
+        hint="Pay professionals for the work they completed in this period."
         action={
           <button
             onClick={() => buildPreview.mutate()}
@@ -111,10 +111,10 @@ export default function Settlement() {
 
           <div className="grid grid-cols-2 gap-px bg-navy-100 sm:grid-cols-5">
             {[
-              { label: 'Members', value: num(preview.totals.members) },
+              { label: 'Professionals', value: num(preview.totals.members) },
               { label: 'Jobs', value: num(preview.totals.jobs) },
               { label: 'Gross', value: inrCompact(preview.totals.gross) },
-              { label: 'Dividend pool', value: inrCompact(preview.totals.dividendPool), tone: 'coop' },
+              { label: 'Commission', value: inrCompact(preview.totals.commission), tone: 'coop' },
               { label: 'Total payable', value: inrCompact(preview.totals.payable), tone: 'strong' },
             ].map((t) => (
               <div key={t.label} className="bg-white px-4 py-3.5">
@@ -136,13 +136,12 @@ export default function Settlement() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Member</th>
+                  <th>Professional</th>
                   <th className="text-right">Jobs</th>
                   <th className="text-right">Gross</th>
                   <th className="text-right">Commission</th>
                   <th className="text-right">Earnings</th>
                   <th className="text-right">Contribution</th>
-                  <th className="text-right">Dividend</th>
                   <th className="text-right">Net payable</th>
                 </tr>
               </thead>
@@ -155,9 +154,6 @@ export default function Settlement() {
                     <td className="tnum text-right text-navy-500">−{inr(l.coopCommission)}</td>
                     <td className="tnum text-right">{inr(l.earnings)}</td>
                     <td className="tnum text-right text-xs text-navy-500">{l.contributionPct}%</td>
-                    <td className="tnum text-right font-semibold text-coop-700">
-                      +{inr(l.dividendShare)}
-                    </td>
                     <td className="tnum text-right font-bold">{inr(l.net)}</td>
                   </tr>
                 ))}
@@ -166,9 +162,9 @@ export default function Settlement() {
           </div>
 
           <p className="border-t border-navy-100 px-5 py-3.5 text-xs leading-relaxed text-navy-500">
-            The dividend column is each member&rsquo;s share of{' '}
-            {inr(preview.totals.dividendPool)} — the portion of this period&rsquo;s commission the
-            general body voted to return — apportioned by their contribution to gross volume.
+            Earnings are net of commission and the platform fee, both taken at booking time.
+            Contribution is this professional&rsquo;s share of the period&rsquo;s gross volume,
+            shown so an unusually large payout is easy to explain.
           </p>
         </section>
       )}
@@ -195,7 +191,7 @@ export default function Settlement() {
             <EmptyState
               icon={Banknote}
               title="No settlement runs yet"
-              hint="Build this week's run to generate draft payouts for your members."
+              hint="Build this week's run to generate draft payouts for your professionals."
             />
           }
         >
@@ -217,11 +213,6 @@ export default function Settlement() {
 
                 <div className="text-right">
                   <p className="tnum font-bold text-navy-900">{inr(p.net)}</p>
-                  {p.dividendShare > 0 && (
-                    <p className="tnum text-xs text-coop-700">
-                      incl. {inr(p.dividendShare)} dividend
-                    </p>
-                  )}
                 </div>
 
                 {p.status === 'paid' ? (
@@ -262,10 +253,8 @@ export default function Settlement() {
       >
         <p className="text-sm leading-relaxed text-navy-700">
           This creates draft payouts for{' '}
-          <strong>{preview?.totals?.members ?? 0} members</strong>, totalling{' '}
-          <strong>{inr(preview?.totals?.payable)}</strong>, of which{' '}
-          <strong className="text-coop-700">{inr(preview?.totals?.dividendPool)}</strong> is
-          dividend.
+          <strong>{preview?.totals?.members ?? 0} professionals</strong>, totalling{' '}
+          <strong>{inr(preview?.totals?.payable)}</strong>.
         </p>
         <p className="muted mt-3">
           Drafts still need approving individually before money moves. Re-running the same period

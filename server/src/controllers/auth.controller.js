@@ -5,13 +5,13 @@ import { signToken } from '../middleware/auth.js';
 import { ROLES, VERIFICATION_STATUS } from '../config/constants.js';
 import { membershipId } from '../utils/ids.js';
 import { toPoint } from '../utils/geo.js';
-import { issueOtp, verifyOtp } from '../services/otp.service.js';
 import { entitledRole, reconcileRole, isOwnerPhone } from '../services/owner.service.js';
+import { assessPassword } from '../services/password.service.js';
 
 const PANEL_LABEL = {
   [ROLES.CUSTOMER]: 'Customer',
-  [ROLES.WORKER]: 'Member',
-  [ROLES.ADMIN]: 'Cooperative Board',
+  [ROLES.WORKER]: 'Professional',
+  [ROLES.ADMIN]: 'Admin',
 };
 
 /**
@@ -38,14 +38,11 @@ const describeAccount = async (user) => {
     role: user.role,
     label: PANEL_LABEL[user.role] ?? user.role,
     isOwner: isOwnerPhone(user.phone),
-    phoneVerified: Boolean(user.phoneVerifiedAt),
     hasPassword,
-    // Which doors this account can actually come through, so the sign-in screen
-    // never offers one that cannot work.
-    signInMethods: hasPassword ? ['otp', 'password'] : ['otp'],
     membershipId: user.membershipId ?? null,
     memberSince: user.createdAt ?? null,
     lastLoginAt: user.lastLoginAt ?? null,
+    passwordChangedAt: user.passwordChangedAt ?? null,
   };
 };
 
@@ -88,6 +85,9 @@ export const register = asyncHandler(async (req, res) => {
   if (await User.exists({ phone })) {
     throw ApiError.conflict('An account with this phone number already exists');
   }
+
+  const verdict = assessPassword(password, { name, phone });
+  if (!verdict.ok) throw ApiError.badRequest(verdict.problems.join(' '));
 
   // `role` is constrained to customer or worker by the schema; an owner number
   // is upgraded here so the operator's own account works however it was made.
@@ -145,81 +145,83 @@ export const register = asyncHandler(async (req, res) => {
   return created(res, await sessionPayload(user));
 });
 
+/**
+ * Password sign-in.
+ *
+ * "No account" and "wrong password" deliberately return the same message. The
+ * distinction is only useful to someone working out which numbers are
+ * registered; a person who owns the number knows perfectly well whether they
+ * have signed up.
+ */
 export const login = asyncHandler(async (req, res) => {
   const { phone, password } = req.body;
 
-  const user = await User.findOne({ phone }).select('+passwordHash');
-  if (!user) throw ApiError.unauthorized('No account found for this number');
-  if (!user.isActive) throw ApiError.forbidden('This account has been deactivated');
-
-  const valid = await user.verifyPassword(password);
-  if (!valid) throw ApiError.unauthorized('Incorrect password');
-
-  await reconcileRole(user);
-  user.lastLoginAt = new Date();
-  await user.save();
-
-  return ok(res, await sessionPayload(user));
-});
-
-/* ------------------------------- OTP sign-in ------------------------------ */
-
-/**
- * Step one: send a code.
- *
- * The response is deliberately identical whether or not an account exists.
- * Answering "no account found" here would turn this endpoint into a directory
- * of which numbers are registered, so instead the client is told a code was
- * sent and learns the account's status only after proving it holds the phone.
- */
-export const requestOtp = asyncHandler(async (req, res) => {
-  const { phone } = req.body;
-
-  const result = await issueOtp({ phone, purpose: 'login', ip: req.ip });
-
-  return ok(res, {
-    sent: true,
-    phone,
-    expiresInSec: result.expiresInSec,
-    channel: result.channel,
-    ...(result.code ? { devCode: result.code } : {}),
-  });
-});
-
-/**
- * Step two: exchange a correct code for a session.
- *
- * A first-time number is registered here rather than being turned away, which
- * is what makes a phone number the whole of the sign-up flow. `name` is
- * optional and only consulted when the account is actually new.
- */
-export const verifyOtpLogin = asyncHandler(async (req, res) => {
-  const { phone, code, name } = req.body;
-
-  await verifyOtp({ phone, code, purpose: 'login' });
-
-  let user = await User.findOne({ phone });
-  let isNew = false;
+  const user = await User.findOne({ phone }).select(
+    '+passwordHash +failedLoginAttempts +lockedUntil',
+  );
 
   if (!user) {
-    user = new User({
-      name: name?.trim() || `Member ${phone.slice(-4)}`,
-      phone,
-      role: ROLES.CUSTOMER,
-    });
-    isNew = true;
+    // Spend roughly what a real comparison costs, so the timing of this branch
+    // does not answer the question the message refuses to.
+    await new User({ phone: '9000000000', name: 'x' }).verifyPassword(password);
+    throw ApiError.unauthorized('That phone number and password do not match');
   }
 
   if (!user.isActive) throw ApiError.forbidden('This account has been deactivated');
 
-  // Owner numbers become admins here and nowhere else — see owner.service.js.
-  user.role = entitledRole(user);
-  user.phoneVerifiedAt = new Date();
-  user.lastLoginAt = new Date();
+  const lock = user.lockState();
+  if (lock.locked) {
+    throw new ApiError(
+      429,
+      `Too many failed attempts. Try again in ${Math.ceil(lock.remainingSec / 60)} minute(s).`,
+    );
+  }
+
+  if (!(await user.verifyPassword(password))) {
+    const state = await user.registerFailedLogin();
+    throw ApiError.unauthorized(
+      state.locked
+        ? `Too many failed attempts. This account is locked for ${Math.ceil(state.remainingSec / 60)} minute(s).`
+        : 'That phone number and password do not match',
+    );
+  }
+
+  await reconcileRole(user);
+  await user.registerSuccessfulLogin();
+
+  return ok(res, await sessionPayload(user));
+});
+
+/**
+ * Change a password, proving the current one first.
+ *
+ * Requiring the old password is what stops a borrowed unlocked phone from
+ * becoming a permanent takeover: a session alone is not enough to lock the
+ * real owner out.
+ */
+export const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  const user = await User.findById(req.user._id).select('+passwordHash');
+  if (!user) throw ApiError.notFound('Account not found');
+
+  if (!(await user.verifyPassword(currentPassword))) {
+    throw ApiError.unauthorized('Your current password is not correct');
+  }
+
+  const verdict = assessPassword(newPassword, { name: user.name, phone: user.phone });
+  if (!verdict.ok) throw ApiError.badRequest(verdict.problems.join(' '));
+
+  if (await user.verifyPassword(newPassword)) {
+    throw ApiError.badRequest('The new password must differ from the current one');
+  }
+
+  await user.setPassword(newPassword);
   await user.save();
 
-  const payload = await sessionPayload(user);
-  return isNew ? created(res, { ...payload, isNew }) : ok(res, { ...payload, isNew });
+  // The old token stays valid until it expires; hand back a fresh one so the
+  // client is not holding a session minted before the credential changed.
+  return ok(res, await sessionPayload(user));
 });
 
 /** Called on app boot to rehydrate the session and decide which panel to mount. */

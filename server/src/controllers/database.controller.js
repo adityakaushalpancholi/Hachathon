@@ -17,14 +17,14 @@ import { env } from '../config/env.js';
 /** Model name → what the operator calls it. Order is the display order. */
 const COLLECTIONS = [
   { model: 'User', label: 'Users', hint: 'Everyone with an account' },
-  { model: 'Worker', label: 'Workers', hint: 'Member profiles, skills, verification' },
-  { model: 'Cooperative', label: 'Cooperatives', hint: 'Societies and their governance' },
+  { model: 'Worker', label: 'Professionals', hint: 'Profiles, skills, verification' },
+  { model: 'Cooperative', label: 'Companies', hint: 'Service companies and their settings' },
   { model: 'Service', label: 'Services', hint: 'The bookable catalogue' },
   { model: 'Booking', label: 'Bookings', hint: 'Every job, in every state' },
+  { model: 'Payment', label: 'Payments', hint: 'Razorpay orders and their outcome' },
   { model: 'Review', label: 'Reviews', hint: 'Ratings and replies' },
   { model: 'Payout', label: 'Payouts', hint: 'Settlement runs and transfers' },
   { model: 'Notification', label: 'Notifications', hint: 'In-app message log' },
-  { model: 'Otp', label: 'Login codes', hint: 'Pending codes; self-expiring' },
 ];
 
 /**
@@ -33,7 +33,7 @@ const COLLECTIONS = [
  * Matched by name across nesting depth, so adding a secret to a subdocument
  * later does not require remembering to come back here.
  */
-const REDACTED = new Set(['passwordHash', 'codeHash', '__v']);
+const REDACTED = new Set(['passwordHash', 'signature', 'failedLoginAttempts', 'lockedUntil', '__v']);
 
 function redact(value) {
   if (Array.isArray(value)) return value.map(redact);
@@ -175,12 +175,10 @@ export const configSummary = asyncHandler(async (_req, res) =>
     nodeEnv: env.nodeEnv,
     timezone: env.timezone,
     owners: env.ownerPhones.length,
-    otp: { ttlMinutes: env.otp.ttlMinutes, maxAttempts: env.otp.maxAttempts, echo: env.otp.echo },
-    sms: { provider: env.sms.provider, configured: env.sms.provider !== 'log' },
+    payments: { provider: 'razorpay', configured: env.razorpay.configured },
     economics: {
       platformFeePct: env.platformFeePct,
-      coopCommissionPct: env.coopCommissionPct,
-      dividendPoolPct: env.dividendPoolPct,
+      commissionPct: env.coopCommissionPct,
     },
     dispatch: {
       radiusKm: env.dispatchRadiusKm,
@@ -191,6 +189,9 @@ export const configSummary = asyncHandler(async (_req, res) =>
     secretsPresent: {
       mongoUri: Boolean(env.mongoUri),
       jwtSecret: Boolean(process.env.JWT_SECRET),
+      razorpayKeyId: Boolean(env.razorpay.keyId),
+      razorpayKeySecret: Boolean(env.razorpay.keySecret),
+      razorpayWebhookSecret: Boolean(env.razorpay.webhookSecret),
     },
   }),
 );

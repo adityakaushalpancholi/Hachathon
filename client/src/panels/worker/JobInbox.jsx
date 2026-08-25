@@ -20,7 +20,7 @@ export default function JobInbox() {
     <div className="mx-auto max-w-4xl">
       <SectionHeader
         title="Job offers"
-        hint="Each offer is sitting in several members' inboxes at once. First to accept takes it."
+        hint="Each offer is sitting in several inboxes at once. First to accept takes it."
       />
 
       <Async

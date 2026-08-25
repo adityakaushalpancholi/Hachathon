@@ -44,7 +44,7 @@ export default function Nearby() {
       <EmptyState
         icon={MapPin}
         title="No address on file"
-        hint="Add a service address to see which members are working near you."
+        hint="Add a service address to see which professionals are working near you."
       />
     );
   }
@@ -232,7 +232,7 @@ function ProximityMap({ center, radiusKm, workers, hovered, onHover, homeLabel }
 
   return (
     <div className="card overflow-hidden bg-navy-950">
-      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="w-full" role="img" aria-label="Map of nearby members">
+      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="w-full" role="img" aria-label="Map of nearby professionals">
         <defs>
           <radialGradient id="glow" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor="#1fa565" stopOpacity="0.22" />

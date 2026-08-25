@@ -54,7 +54,7 @@ export default function Operations() {
 
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-red-900">
-                      {b.sos.raisedBy === 'customer' ? 'Customer' : 'Member'} raised an alert ·{' '}
+                      {b.sos.raisedBy === 'customer' ? 'Customer' : 'Professional'} raised an alert ·{' '}
                       <span className="font-mono">{b.code}</span>
                     </p>
                     <p className="mt-0.5 text-sm text-red-800">
@@ -69,7 +69,7 @@ export default function Operations() {
                         </a>
                       )}
                       {b.worker?.displayName && (
-                        <span className="badge-navy">Member: {b.worker.displayName}</span>
+                        <span className="badge-navy">Pro: {b.worker.displayName}</span>
                       )}
                     </div>
                   </div>
@@ -94,7 +94,7 @@ export default function Operations() {
       <section>
         <SectionHeader
           title="All bookings"
-          hint="Everything routed through your cooperative, newest first."
+          hint="Every booking, newest first."
         />
 
         <div className="mb-4">
@@ -122,11 +122,11 @@ export default function Operations() {
                   <th>Code</th>
                   <th>Service</th>
                   <th>Customer</th>
-                  <th>Member</th>
+                  <th>Professional</th>
                   <th>Zone</th>
                   <th>Scheduled</th>
                   <th className="text-right">Total</th>
-                  <th className="text-right">To member</th>
+                  <th className="text-right">To pro</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -165,7 +165,7 @@ export default function Operations() {
           {[
             'Spoke to both parties, situation is safe',
             'False alarm — raised by mistake',
-            'Job cancelled and member reassigned',
+            'Job cancelled and reassigned',
             'Escalated to the board for review',
           ].map((r) => (
             <button

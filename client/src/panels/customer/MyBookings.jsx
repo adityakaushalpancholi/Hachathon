@@ -31,7 +31,7 @@ export default function MyBookings() {
     <div className="mx-auto max-w-4xl">
       <SectionHeader
         title="My bookings"
-        hint="Everything you have booked through the cooperative network."
+        hint="Every booking you have made, newest first."
         action={
           <Link to="/app/book" className="btn-primary">
             <PlusCircle size={16} /> New booking
@@ -117,7 +117,7 @@ export default function MyBookings() {
                   <div className="shrink-0 text-right">
                     <p className="tnum font-bold text-navy-900">{inr(b.pricing?.total)}</p>
                     <p className="mt-0.5 text-xs text-coop-700">
-                      {inr(b.pricing?.workerPayout)} to the member
+                      {inr(b.pricing?.workerPayout)} to the pro
                     </p>
                   </div>
                 </div>

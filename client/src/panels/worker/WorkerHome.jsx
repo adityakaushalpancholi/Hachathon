@@ -153,7 +153,7 @@ export default function WorkerHome() {
                   </p>
                   <p className="mt-1 text-sm leading-relaxed text-amber-800">
                     {profile?.verification?.note ||
-                      'Your cooperative’s board is reviewing your documents. You can go online and take jobs once they approve you — members verify members here, so a person is reading your file.'}
+                      'An administrator is reviewing your documents. You can go online and take jobs once you are approved — a person reads every file, so this is not an automated check.'}
                   </p>
                 </div>
               </div>

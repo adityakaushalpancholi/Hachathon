@@ -4,7 +4,7 @@
  */
 export const STATUS_META = {
   pending: { label: 'Finding a member', cls: 'badge-amber', step: 0 },
-  dispatching: { label: 'Offering to members', cls: 'badge-amber', step: 1 },
+  dispatching: { label: 'Offering to pros', cls: 'badge-amber', step: 1 },
   accepted: { label: 'Accepted', cls: 'badge-coop', step: 2 },
   enroute: { label: 'On the way', cls: 'badge-saffron', step: 3 },
   arrived: { label: 'Arrived', cls: 'badge-saffron', step: 4 },

@@ -20,9 +20,14 @@ services:
       # role — the deliberate fail-closed default.
       - key: OWNER_PHONES
         sync: false
-      # Codes are written to the log stream until a provider is configured.
-      - key: SMS_PROVIDER
-        value: log
+      # Razorpay. Without these, online payment is disabled and bookings
+      # settle in cash on completion — the app stays fully usable either way.
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
       # One-shot cleanup for a deployment that was demo-seeded before it went
       # live: set to "true", redeploy, then set it back. Refuses to touch a
       # database without the demo seed's mark, and keeps the catalogue.

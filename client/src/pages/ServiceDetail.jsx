@@ -49,7 +49,7 @@ export default function ServiceDetail() {
                 {service.checklist?.length > 0 && (
                   <div className="mt-10">
                     <SectionHeader
-                      title="What the member will do"
+                      title="What the professional will do"
                       hint="The same checklist appears on their screen during the job."
                     />
                     <ol className="card divide-y divide-navy-50">
@@ -87,7 +87,7 @@ export default function ServiceDetail() {
 
                 {service.topWorkers?.length > 0 && (
                   <div className="card-pad">
-                    <h3 className="mb-1 text-sm font-bold text-navy-900">Top members for this</h3>
+                    <h3 className="mb-1 text-sm font-bold text-navy-900">Top pros for this</h3>
                     <p className="mb-4 text-xs text-navy-500">
                       Book one directly, or let the system offer the job to whoever is closest.
                     </p>
@@ -124,8 +124,8 @@ export default function ServiceDetail() {
                 <div className="card-pad bg-coop-50">
                   <h3 className="text-sm font-bold text-coop-900">Where your money goes</h3>
                   <p className="mt-2 text-sm leading-relaxed text-coop-800">
-                    About <strong>90%</strong> of what you pay reaches the member directly. The
-                    cooperative retains 8%, and 40% of that comes back to members as a dividend.
+                    About <strong>90%</strong> of what you pay reaches the professional directly. The
+                    company retains 8% and the platform 2%. The split is shown on every booking.
                   </p>
                   <p className="mt-3 text-xs text-coop-700">
                     You will see the exact split for your booking before you confirm it.

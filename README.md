@@ -1,12 +1,12 @@
 # ShramSetu
 
-A cooperative-owned digital marketplace for home services. The people who do the
-work own the platform, elect the board that verifies members, vote on the
-commission rate and the hourly rate floor, and share the surplus their labour
-generates.
+A home-services marketplace: book a verified electrician, plumber, cleaner or
+carpenter at a fixed price, matched to whoever is nearest and free. Ninety
+percent of the bill reaches the professional, and the split is printed on the
+screen where you confirm.
 
-Three role-gated panels — **customer**, **member (worker)**, and **cooperative
-board (admin)** — over one Express + MongoDB API.
+Three role-gated panels — **customer**, **professional**, and **admin** — over
+one Express + MongoDB API, with Razorpay for payment.
 
 ---
 
@@ -29,18 +29,25 @@ npm run dev
 
 ### Signing in
 
-Sign-in is by one-time code: enter a mobile number, enter the code, and the
-account is created on first use. Locally there is no SMS provider, so the code is
-written to the server log — or returned in the response body if you set
-`OTP_ECHO=true`, which production refuses to boot with.
+Sign-in is a mobile number and a password. Passwords are stored as bcrypt hashes
+at cost 12 and are checked against a short policy — at least 8 characters, some
+mix of letters and digits, not a breach-list favourite, and not built out of the
+account's own name or number.
+
+Guessing is throttled in two independent places. The rate limiter is keyed on the
+phone number rather than the caller's address, because a shared mobile gateway
+puts thousands of legitimate users behind one IP while an attacker rotates
+addresses freely. On top of that, five wrong attempts lock the account itself and
+each further round doubles the wait, capped at an hour — so the lock cannot be
+used to shut a real owner out permanently.
 
 Your role follows from configuration, not from anything in the database:
 
 | Panel | How an account gets it |
 |---|---|
 | Customer | The default for any new number |
-| Member | Register with `role: "worker"`; the board then verifies the profile |
-| Board | The number appears in `OWNER_PHONES` |
+| Professional | Register with `role: "worker"`; an admin then verifies the profile |
+| Admin | The number appears in `OWNER_PHONES` |
 
 `OWNER_PHONES` is a comma-separated list read from the environment on every
 request. An `admin` row written directly into the database does not grant the
@@ -73,7 +80,7 @@ The suite needs the demo fixtures and an admin to test with, so start the server
 with both, then run it:
 
 ```bash
-SEED_DEMO=true OWNER_PHONES=9876500001 OTP_ECHO=true npm run dev --prefix server
+SEED_DEMO=true OWNER_PHONES=9876500001 npm run dev --prefix server
 ```
 
 ```bash
@@ -81,7 +88,7 @@ npm run smoke --prefix server
 ```
 
 End-to-end checks against the running API: the full customer → dispatch → worker
-→ job code → completion → review → settlement path, the one-time code sign-in,
+→ job code → completion → review → settlement path, password sign-in and lockout,
 the role boundaries between the three panels, and the owner-only database panel
 including its redaction and allowlist guarantees.
 
@@ -99,38 +106,38 @@ npm run seed
 
 ---
 
-## What makes it a cooperative, in the code
+## Decisions worth knowing about
 
-This is not branding on a generic marketplace. Four things are structurally
-different, and each one is a specific mechanism you can point at:
-
-**Commission is 8%, not 25%, and 40% of it comes back.**
+**The payout split is fixed at booking time and never recomputed.**
 `buildPricing()` in [pricing.service.js](server/src/services/pricing.service.js)
-returns the complete split, and the customer sees it *before* confirming —
-the same numbers the settlement run uses later.
+returns the complete split, the customer sees it before confirming, and
+settlement later just adds up what was already agreed. Recomputing at settlement
+would let a change to the commission rate reach back and rewrite what someone was
+told they would earn.
 
 **Dispatch has a fairness term.**
 Ranking in [matching.service.js](server/src/services/matching.service.js) blends
-proximity, rating and reliability — and a fairness score that boosts members who
-have worked fewer jobs than the local median. On an investor-owned platform the
-highest-rated worker in a zone absorbs the volume and newcomers starve; here
-work spreads across the membership. It is bounded, so it never overrides a large
-distance or a poor rating.
+proximity, rating and reliability — plus a bounded fairness score that boosts
+professionals who have worked fewer jobs than the local median. Without it the
+highest-rated worker in a zone absorbs the volume and newcomers never start. It
+is bounded precisely so it can never override a large distance or a poor rating.
 
-**Surge has a ceiling the members voted for.**
-`computeSurge()` scales on the square root of the demand/supply ratio and is
-capped by each cooperative's `governance.surgeCeiling`. The uplift goes to the
-member's payout, not to platform margin. The live surge board is published to
-members, not hidden.
+**Surge is capped, and the uplift goes to the worker.**
+`computeSurge()` scales on the square root of the demand/supply ratio — square
+root rather than linear so a temporary shortage does not produce a headline
+price — and is capped by each company's `governance.surgeCeiling`.
 
-**Members verify members.**
-The verification queue in the admin panel is scoped to the reviewing admin's own
-cooperative, and the decision is recorded against the deciding user.
+**Payment is verified server-side, never trusted from the browser.**
+Razorpay Checkout runs in the customer's browser, so everything it hands back is
+attacker-controlled. [payment.service.js](server/src/services/payment.service.js)
+recomputes the HMAC over `order_id|payment_id` with the key secret and compares
+it in constant time before anything is marked paid. The order amount comes from
+the stored booking, never from the request body.
 
-**Surplus is returned as a dividend.**
-[payout.service.js](server/src/services/payout.service.js) apportions the
-dividend pool by contribution — each member's share of the period's gross — and
-the settlement screen shows that percentage on every line.
+**The database is kept small on purpose.**
+Notifications self-delete after 60 days and abandoned payment orders after a day,
+both via TTL indexes, so the two collections that would otherwise grow without
+limit stay bounded with no sweep to schedule.
 
 ---
 
@@ -139,14 +146,14 @@ the settlement screen shows that percentage on every line.
 | From | Mechanism | Where it lives |
 |---|---|---|
 | Urban Company | Fixed-scope, fixed-price **packages** instead of hourly haggling | [Service.js](server/src/models/Service.js) |
-| Urban Company | Job **checklist** shown to customer and member alike | `Service.checklist` |
+| Urban Company | Job **checklist** shown to customer and professional alike | `Service.checklist` |
 | Urban Company | **Book this professional** directly | `dispatchToWorker()` |
 | Rapido | **Broadcast dispatch** — top-N nearest, first-accept-wins | [dispatch.service.js](server/src/services/dispatch.service.js) |
 | Rapido | **Countdown** on each offer, then re-broadcast wider | `expireStaleDispatches()` |
-| Rapido | **OTP to start** the job, and a second to close it | [booking.service.js](server/src/services/booking.service.js) |
+| Rapido | A **4-digit code to start** the job, and a second to close it | [booking.service.js](server/src/services/booking.service.js) |
 | Rapido | **Surge** from live demand/supply | `computeSurge()` |
-| Rapido | Daily **incentive target** on the worker's home screen | `workerEarnings()` |
-| Both | **SOS** raisable by either side, routed to the board | `raiseSos()` |
+| Rapido | Daily **incentive target** on the professional's home screen | `workerEarnings()` |
+| Both | **SOS** raisable by either side, routed to an administrator | `raiseSos()` |
 
 ---
 
@@ -162,8 +169,8 @@ client/  React 18 + Vite + Tailwind + React Router
 server/  Express, layered:  routes -> controllers -> services
    |     business logic sits in services/, testable without HTTP
    v
-MongoDB  8 collections, 2dsphere geo indexes, aggregation pipelines
-         for demand forecasting and settlement
+MongoDB  9 collections, 2dsphere geo indexes, TTL expiry on the two
+         that would otherwise grow without limit
 ```
 
 Full detail in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
@@ -177,7 +184,7 @@ Sign-in returns a JWT whose `role` claim names the panel. The client mounts the
 matching panel and nothing else — but that is a convenience, not the boundary.
 Every panel-scoped route re-checks the claim server-side through `requireRole`,
 and admin routes additionally scope their queries to the admin's own
-cooperative. Editing the token in `localStorage` changes which screen renders,
+company. Editing the token in `localStorage` changes which screen renders,
 and nothing about what data comes back.
 
 The smoke test asserts this directly: a customer token gets 403 from

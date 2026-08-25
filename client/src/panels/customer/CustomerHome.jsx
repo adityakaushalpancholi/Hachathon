@@ -40,7 +40,7 @@ export default function CustomerHome() {
       <section>
         <SectionHeader
           title={`Hello, ${user?.name?.split(' ')[0]}`}
-          hint="Your activity across the cooperative network."
+          hint="Everything you have booked so far."
           action={
             <Link to="/app/book" className="btn-primary">
               <PlusCircle size={16} /> Book a service
@@ -167,7 +167,7 @@ export default function CustomerHome() {
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-bold text-navy-900">Who is nearby right now</span>
               <span className="block text-xs text-navy-500">
-                Live map of available members around you
+                Live map of available professionals around you
               </span>
             </span>
             <ArrowRight size={15} className="shrink-0 text-navy-300" />

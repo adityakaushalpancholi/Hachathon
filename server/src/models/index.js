@@ -6,4 +6,4 @@ export { Booking } from './Booking.js';
 export { Review } from './Review.js';
 export { Notification } from './Notification.js';
 export { Payout } from './Payout.js';
-export { Otp } from './Otp.js';
+export { Payment } from './Payment.js';

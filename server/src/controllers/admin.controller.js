@@ -65,14 +65,6 @@ export const overview = asyncHandler(async (req, res) => {
           code: coop.code,
           city: coop.city,
           governance: coop.governance,
-          // Virtuals do not survive .lean(), so recompute the pool here.
-          dividendPool: Math.max(
-            0,
-            Math.round(
-              coop.stats.commissionEarned * coop.governance.dividendPoolPct -
-                coop.stats.dividendsDistributed,
-            ),
-          ),
           stats: coop.stats,
         }
       : null,

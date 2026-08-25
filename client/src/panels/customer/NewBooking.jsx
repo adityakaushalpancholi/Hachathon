@@ -168,7 +168,7 @@ export default function NewBooking() {
       <EmptyState
         icon={MapPin}
         title="Add an address first"
-        hint="We need a service location before we can find members near you."
+        hint="We need a service location before we can find professionals near you."
       />
     );
   }
@@ -423,7 +423,7 @@ function StepService({
                   Book as an emergency
                 </span>
                 <span className="block text-xs text-saffron-700">
-                  Dispatched immediately over a wider radius, to members who opted into emergency
+                  Dispatched immediately over a wider radius, to professionals who opted into emergency
                   work. Adds {inr(service.emergencySurcharge)}.
                 </span>
               </span>
@@ -531,7 +531,7 @@ function StepWhenWhere({
 
       <div>
         <label htmlFor="notes" className="label">
-          Anything the member should know? <span className="font-normal normal-case">(optional)</span>
+          Anything the professional should know? <span className="font-normal normal-case">(optional)</span>
         </label>
         <textarea
           id="notes"
@@ -605,7 +605,7 @@ function StepConfirm({
 
           {preferredWorker && (
             <div className="flex gap-3">
-              <dt className="w-24 shrink-0 text-navy-500">Member</dt>
+              <dt className="w-24 shrink-0 text-navy-500">Professional</dt>
               <dd className="flex items-center gap-2 font-medium text-navy-900">
                 <Avatar name={preferredWorker.displayName} size={22} />
                 {preferredWorker.displayName}

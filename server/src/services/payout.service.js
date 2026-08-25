@@ -16,20 +16,13 @@ const isoWeekLabel = (d) => {
 };
 
 /**
- * Build a settlement run for a cooperative.
+ * Build a settlement run for one company over a period.
  *
- * Two components make up a member's payout:
- *
- *   1. Job earnings  — the `workerPayout` line from every booking they completed
- *                      in the period, already net of commission and platform fee.
- *   2. Dividend      — their share of the cooperative's undistributed commission
- *                      pool. This is the part that does not exist on an
- *                      investor-owned platform: the margin comes back to the
- *                      people who generated it.
- *
- * Dividend is apportioned by contribution (each member's share of the period's
- * gross), not equally, so a member who worked more receives more — a rule the
- * general body sets and can change.
+ * A professional's payout is the `workerPayout` line from every booking they
+ * completed in the period — already net of commission and platform fee, since
+ * the split is computed once at booking time and never recomputed here.
+ * Recomputing it at settlement would let a later change to the commission rate
+ * silently rewrite what someone was told they would earn.
  */
 export async function buildSettlement(cooperativeId, { from, to } = {}) {
   const coop = await Cooperative.findById(cooperativeId);
@@ -66,11 +59,9 @@ export async function buildSettlement(cooperativeId, { from, to } = {}) {
 
   const totalGross = rows.reduce((s, r) => s + r.gross, 0);
   const totalCommission = rows.reduce((s, r) => s + r.commission, 0);
-  const dividendPool = Math.round(totalCommission * coop.governance.dividendPoolPct);
 
   const lines = rows.map((r) => {
     const share = totalGross ? r.gross / totalGross : 0;
-    const dividendShare = Math.round(dividendPool * share);
     return {
       worker: r._id,
       bookings: r.bookings,
@@ -79,8 +70,7 @@ export async function buildSettlement(cooperativeId, { from, to } = {}) {
       coopCommission: Math.round(r.commission),
       platformFee: Math.round(r.platformFee),
       earnings: Math.round(r.net),
-      dividendShare,
-      net: Math.round(r.net) + dividendShare,
+      net: Math.round(r.net),
       contributionPct: Math.round(share * 1000) / 10,
     };
   });
@@ -95,7 +85,6 @@ export async function buildSettlement(cooperativeId, { from, to } = {}) {
       jobs: lines.reduce((s, l) => s + l.jobs, 0),
       gross: Math.round(totalGross),
       commission: Math.round(totalCommission),
-      dividendPool,
       payable: lines.reduce((s, l) => s + l.net, 0),
     },
   };
@@ -120,7 +109,6 @@ export async function commitSettlement(cooperativeId, adminId, { from, to } = {}
           gross: line.gross,
           coopCommission: line.coopCommission,
           platformFee: line.platformFee,
-          dividendShare: line.dividendShare,
           net: line.net,
           status: 'draft',
           approvedBy: adminId,
@@ -149,19 +137,12 @@ export async function releasePayout(payoutId, adminId) {
 
   const worker = await Worker.findById(payout.worker);
   if (worker) {
-    // Job earnings leave the pending balance; the dividend is additive, so it is
-    // recorded separately rather than deducted from anything.
-    const jobEarnings = payout.net - payout.dividendShare;
-    worker.earnings.pendingPayout = Math.max(0, worker.earnings.pendingPayout - jobEarnings);
-    worker.earnings.dividendsReceived += payout.dividendShare;
+    // Settling clears what was owed — the money has actually moved now.
+    worker.earnings.pendingPayout = Math.max(0, worker.earnings.pendingPayout - payout.net);
+    worker.earnings.totalPaid = (worker.earnings.totalPaid ?? 0) + payout.net;
     await worker.save();
     await notifyPayout(worker.user, payout);
   }
-
-  await Cooperative.updateOne(
-    { _id: payout.cooperative },
-    { $inc: { 'stats.dividendsDistributed': payout.dividendShare } },
-  );
 
   return payout;
 }
@@ -236,7 +217,6 @@ export async function workerEarnings(workerId) {
     thisMonth: Math.round(month.earned),
     jobsThisMonth: month.jobs,
     pendingPayout: Math.round(worker.earnings.pendingPayout),
-    dividendsReceived: Math.round(worker.earnings.dividendsReceived),
     today: {
       jobs: todayRow?.jobs ?? 0,
       earned: Math.round(todayRow?.earned ?? 0),

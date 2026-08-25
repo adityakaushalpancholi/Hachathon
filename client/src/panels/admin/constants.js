@@ -13,12 +13,12 @@ export const RECOMMENDATION_META = {
   recruit_urgently: {
     label: 'Recruit now',
     cls: 'badge-red',
-    body: 'Demand is outrunning the members you have. Requests are going unmatched.',
+    body: 'Demand is outrunning the professionals you have. Requests are going unmatched.',
   },
   train_existing_members: {
-    label: 'Retrain members',
+    label: 'Retrain staff',
     cls: 'badge-amber',
-    body: 'Under pressure. Cross-training existing members is faster than recruiting.',
+    body: 'Under pressure. Cross-training the professionals you have is faster than recruiting.',
   },
   balanced: {
     label: 'Balanced',
@@ -28,6 +28,6 @@ export const RECOMMENDATION_META = {
   oversupplied: {
     label: 'Oversupplied',
     cls: 'badge-navy',
-    body: 'More members than work. Consider marketing this trade, or redeploying members.',
+    body: 'More professionals than work. Consider marketing this trade, or redeploying them.',
   },
 };

@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 /**
  * A settlement run. Worker earnings accrue per completed booking and are swept
  * into a Payout on the coop's settlement cycle, together with the member's share
- * of the dividend pool.
+ * of the period's completed work.
  */
 const payoutSchema = new mongoose.Schema(
   {
@@ -22,7 +22,6 @@ const payoutSchema = new mongoose.Schema(
     coopCommission: { type: Number, default: 0 },
     platformFee: { type: Number, default: 0 },
     adjustments: [{ label: String, amount: Number }],
-    dividendShare: { type: Number, default: 0 },
     net: { type: Number, required: true, default: 0 },
 
     status: {

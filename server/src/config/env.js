@@ -39,35 +39,17 @@ export const env = {
    */
   ownerPhones: list(process.env.OWNER_PHONES),
 
-  /** One-time passcodes. Codes are stored hashed and expire on a TTL index. */
-  otp: {
-    length: num(process.env.OTP_LENGTH, 6),
-    ttlMinutes: num(process.env.OTP_TTL_MINUTES, 5),
-    maxAttempts: num(process.env.OTP_MAX_ATTEMPTS, 5),
-    resendCooldownSec: num(process.env.OTP_RESEND_COOLDOWN_SEC, 30),
-    /**
-     * Echo the code in the API response. Never enable in production — it turns
-     * possession of a phone number into a login. Guarded again at the call site.
-     */
-    echo: bool(process.env.OTP_ECHO, false),
-  },
-
   /**
-   * SMS delivery. With no provider configured the code is written to the
-   * server log, which keeps a fresh deployment usable (the operator can read
-   * it from the platform's log stream) without silently pretending to send.
+   * Razorpay. Absent keys mean payments are simply unavailable rather than
+   * half-working: the API says so plainly and the client hides the pay button,
+   * which is a far better failure than a checkout that opens and then dies.
    */
-  sms: {
-    provider: process.env.SMS_PROVIDER || 'log', // log | msg91 | twilio
-    senderId: process.env.SMS_SENDER_ID || 'SHRMST',
-    msg91: {
-      authKey: process.env.MSG91_AUTH_KEY || '',
-      templateId: process.env.MSG91_TEMPLATE_ID || '',
-    },
-    twilio: {
-      accountSid: process.env.TWILIO_ACCOUNT_SID || '',
-      authToken: process.env.TWILIO_AUTH_TOKEN || '',
-      from: process.env.TWILIO_FROM || '',
+  razorpay: {
+    keyId: process.env.RAZORPAY_KEY_ID || '',
+    keySecret: process.env.RAZORPAY_KEY_SECRET || '',
+    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || '',
+    get configured() {
+      return Boolean(this.keyId && this.keySecret);
     },
   },
 
@@ -75,10 +57,9 @@ export const env = {
     .split(',')
     .map((s) => s.trim()),
 
-  // Marketplace economics — cooperative model
-  platformFeePct: num(process.env.PLATFORM_FEE_PCT, 0.02), // keeps the lights on
-  coopCommissionPct: num(process.env.COOP_COMMISSION_PCT, 0.08), // vs 20-30% on investor-owned apps
-  dividendPoolPct: num(process.env.DIVIDEND_POOL_PCT, 0.4), // share of commission returned to members
+  // Marketplace economics. Split once at booking time and never recomputed.
+  platformFeePct: num(process.env.PLATFORM_FEE_PCT, 0.02), // runs the platform
+  coopCommissionPct: num(process.env.COMMISSION_PCT, 0.08), // the company's margin
 
   // Dispatch engine
   dispatchRadiusKm: num(process.env.DISPATCH_RADIUS_KM, 8),
@@ -144,10 +125,6 @@ export function assertProductionConfig() {
 
   if (!env.mongoUri) {
     problems.push('MONGO_URI is unset, so this would run on a throwaway in-memory database that is wiped on every restart.');
-  }
-
-  if (env.otp.echo) {
-    problems.push('OTP_ECHO is on, which returns login codes in the API response to anyone who knows a phone number.');
   }
 
   if (env.seedDemo) {

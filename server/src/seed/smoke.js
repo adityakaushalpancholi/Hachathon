@@ -6,7 +6,7 @@
  * started with the demo fixtures and with the seeded board account nominated as
  * an owner — otherwise there is no admin to test with, by design:
  *
- *   SEED_DEMO=true OWNER_PHONES=9876500001 OTP_ECHO=true node src/index.js
+ *   SEED_DEMO=true OWNER_PHONES=9876500001 node src/index.js
  *   node src/seed/smoke.js
  */
 const OWNER_PHONE = process.env.SMOKE_OWNER_PHONE || '9876500001';
@@ -78,8 +78,8 @@ async function main() {
   check(
     'the API describes the account it just issued',
     customer.data?.account?.role === 'customer' &&
-      Array.isArray(customer.data?.account?.signInMethods) &&
-      customer.data.account.signInMethods.includes('password'),
+      customer.data?.account?.label === 'Customer' &&
+      customer.data?.account?.hasPassword === true,
     customer.data?.account,
   );
 
@@ -89,68 +89,94 @@ async function main() {
   check('the admin is flagged as the platform owner', admin.data?.account?.isOwner === true, admin.data?.account);
   const adminToken = admin.data.token;
 
-  /* --------------------------- one-time codes -------------------------- */
-  section('One-time code sign-in');
+  /* ------------------------- password functionality -------------------- */
+  section('Password sign-in');
 
   const newPhone = `98${String(Date.now()).slice(-8)}`;
 
-  const req1 = await api('POST', '/auth/otp/request', { body: { phone: newPhone } });
-  check('OTP request accepted', req1.status === 200 && req1.data?.sent === true, req1);
-  check('OTP echo is on (server needs OTP_ECHO=true)', typeof req1.data?.devCode === 'string', req1.data);
+  const weak = await api('POST', '/auth/register', {
+    body: { name: 'Smoke Weak', phone: newPhone, password: 'password123', role: 'customer' },
+  });
+  check('a breach-list password is refused at sign-up', weak.status === 400, weak);
 
-  /* Both numbers must be asking for their first code — the resend cooldown is a
-     rate limit, not a disclosure, and comparing a number that already has a live
-     code against a fresh one would measure the wrong thing. So the registered
-     side is created here, through the password route, which never issues one. */
-  const knownPhone = `97${String(Date.now()).slice(-8)}`;
-  const freshPhone = `96${String(Date.now()).slice(-8)}`;
+  const short = await api('POST', '/auth/register', {
+    body: { name: 'Smoke Short', phone: newPhone, password: 'ab1', role: 'customer' },
+  });
+  check('a too-short password is refused', short.status === 400, short);
 
+  const selfNamed = await api('POST', '/auth/register', {
+    body: { name: 'Smoke User', phone: newPhone, password: `pw${newPhone}`, role: 'customer' },
+  });
+  check('a password built from the phone number is refused', selfNamed.status === 400, selfNamed);
+
+  const signup = await api('POST', '/auth/register', {
+    body: { name: 'Smoke Password Account', phone: newPhone, password: 'Kestrel-9-Loom', role: 'customer' },
+  });
+  check('a strong password is accepted', signup.status === 201 && !!signup.data?.token, signup);
+  check('a new account lands on the customer panel', signup.data?.panel === 'customer', signup.data?.panel);
+  check('the account reports that it has a password', signup.data?.account?.hasPassword === true, signup.data?.account);
+  check('the account records when the password was set', typeof signup.data?.account?.passwordChangedAt === 'string', signup.data?.account);
+
+  /* An unknown number and a wrong password must be indistinguishable, or the
+     endpoint becomes a directory of which numbers are registered. */
+  const wrongPw = await api('POST', '/auth/login', { body: { phone: newPhone, password: 'Wrong-9-Guess' } });
+  const noSuch = await api('POST', '/auth/login', { body: { phone: `95${String(Date.now()).slice(-8)}`, password: 'Wrong-9-Guess' } });
+  check(
+    'a wrong password and an unknown number answer identically',
+    wrongPw.status === noSuch.status &&
+      wrongPw.error?.message === noSuch.error?.message &&
+      wrongPw.status === 401,
+    { wrongPw: wrongPw.error, noSuch: noSuch.error },
+  );
+
+  /* ------------------------------ lockout ------------------------------ */
+  const lockPhone = `94${String(Date.now()).slice(-8)}`;
   await api('POST', '/auth/register', {
-    body: { name: 'Smoke Known Account', phone: knownPhone, password: 'smoke-pass-123', role: 'customer' },
+    body: { name: 'Smoke Lock Target', phone: lockPhone, password: 'Thicket-42-Vale', role: 'customer' },
   });
 
-  const knownReq = await api('POST', '/auth/otp/request', { body: { phone: knownPhone } });
-  const freshReq = await api('POST', '/auth/otp/request', { body: { phone: freshPhone } });
+  let lockedAt = null;
+  for (let attempt = 1; attempt <= 6 && lockedAt === null; attempt += 1) {
+    const r = await api('POST', '/auth/login', { body: { phone: lockPhone, password: 'Nope-1-Nope' } });
+    if (/locked|Too many/i.test(r.error?.message ?? '')) lockedAt = attempt;
+  }
+  check('repeated wrong passwords lock the account', lockedAt !== null && lockedAt <= 5, { lockedAt });
 
-  const shape = (r) => JSON.stringify(Object.keys(r.data ?? {}).sort());
-  check(
-    'the response does not reveal whether a number is registered',
-    knownReq.status === freshReq.status &&
-      knownReq.data?.sent === freshReq.data?.sent &&
-      shape(knownReq) === shape(freshReq),
-    { known: { status: knownReq.status, keys: shape(knownReq) }, fresh: { status: freshReq.status, keys: shape(freshReq) } },
-  );
+  const lockedOut = await api('POST', '/auth/login', { body: { phone: lockPhone, password: 'Thicket-42-Vale' } });
+  check('a locked account refuses even the correct password', lockedOut.status === 429, lockedOut);
 
-  const wrongCode = await api('POST', '/auth/otp/verify', {
-    body: { phone: newPhone, code: req1.data.devCode === '000000' ? '111111' : '000000' },
+  /* --------------------------- change password ------------------------- */
+  const pwToken = signup.data.token;
+
+  const wrongCurrent = await api('POST', '/auth/password', {
+    token: pwToken,
+    body: { currentPassword: 'Not-The-9-One', newPassword: 'Marram-7-Drift' },
   });
-  check('a wrong code is rejected with 401', wrongCode.status === 401, wrongCode);
+  check('changing a password requires the current one', wrongCurrent.status === 401, wrongCurrent);
 
-  const otpNew = await api('POST', '/auth/otp/verify', {
-    body: { phone: newPhone, code: req1.data.devCode, name: 'Smoke Test Account' },
+  const reuse = await api('POST', '/auth/password', {
+    token: pwToken,
+    body: { currentPassword: 'Kestrel-9-Loom', newPassword: 'Kestrel-9-Loom' },
   });
-  check('correct code signs in', !!otpNew.data?.token, otpNew);
-  check('an unknown number creates its account', otpNew.data?.isNew === true, otpNew.data);
-  check('a new account lands on the customer panel', otpNew.data?.panel === 'customer', otpNew.data?.panel);
-  check('the number is recorded as verified', otpNew.data?.account?.phoneVerified === true, otpNew.data?.account);
-  check(
-    'an OTP-only account is not offered a password',
-    otpNew.data?.account?.hasPassword === false &&
-      !otpNew.data.account.signInMethods.includes('password'),
-    otpNew.data?.account,
-  );
+  check('the new password must differ from the old', reuse.status === 400, reuse);
 
-  const replay = await api('POST', '/auth/otp/verify', {
-    body: { phone: newPhone, code: req1.data.devCode },
+  const changed = await api('POST', '/auth/password', {
+    token: pwToken,
+    body: { currentPassword: 'Kestrel-9-Loom', newPassword: 'Marram-7-Drift' },
   });
-  check('a consumed code cannot be replayed', replay.status === 401, replay);
+  check('a valid change succeeds and re-issues a token', changed.status === 200 && !!changed.data?.token, changed);
+
+  const oldPw = await api('POST', '/auth/login', { body: { phone: newPhone, password: 'Kestrel-9-Loom' } });
+  check('the old password stops working', oldPw.status === 401, oldPw);
+
+  const newPw = await api('POST', '/auth/login', { body: { phone: newPhone, password: 'Marram-7-Drift' } });
+  check('the new password works', newPw.status === 200 && !!newPw.data?.token, newPw);
 
   /* ------------------------- administration is not grantable ------------ */
   section('Administration is rooted in configuration');
 
-  const ownerOtp = await api('POST', '/auth/otp/request', { body: { phone: OWNER_PHONE } });
-  const ownerSession = await api('POST', '/auth/otp/verify', {
-    body: { phone: OWNER_PHONE, code: ownerOtp.data.devCode },
+  const ownerSession = await api('POST', '/auth/login', {
+    body: { phone: OWNER_PHONE, password: 'admin123' },
   });
   check('an owner number signs in as admin without any grant', ownerSession.data?.panel === 'admin', ownerSession.data?.panel);
 
@@ -159,10 +185,30 @@ async function main() {
     (await api('POST', '/admin/users/promote', { token: adminToken, body: { role: 'admin' } })).status === 404,
   );
 
-  const otpToken = otpNew.data.token;
-  const nonOwnerToDb = await api('GET', '/database', { token: otpToken });
+  const nonOwnerToDb = await api('GET', '/database', { token: newPw.data.token });
   check('a customer is refused the database panel (403)', nonOwnerToDb.status === 403, nonOwnerToDb);
   check('the database panel refuses anonymous callers (401)', (await api('GET', '/database')).status === 401);
+
+  /* ------------------------------- payments ---------------------------- */
+  section('Payments');
+
+  const payCfg = await api('GET', '/payments/config');
+  check('payment config is public', payCfg.status === 200, payCfg);
+  check('config states whether the gateway is usable', typeof payCfg.data?.enabled === 'boolean', payCfg.data);
+  check('the key secret is never returned', !JSON.stringify(payCfg).toLowerCase().includes('keysecret'), payCfg.data);
+
+  check(
+    'creating an order requires a session',
+    (await api('POST', '/payments/order', { body: { bookingId: '000000000000000000000000' } })).status === 401,
+  );
+
+  if (!payCfg.data?.enabled) {
+    const noGateway = await api('POST', '/payments/order', {
+      token: custToken,
+      body: { bookingId: '000000000000000000000000' },
+    });
+    check('an unconfigured gateway says so plainly (503)', noGateway.status === 503, noGateway);
+  }
 
   /* ---------------------------- database panel ------------------------- */
   section('Database panel (owner only)');
@@ -177,8 +223,16 @@ async function main() {
   check('owner reads a page of documents', users.data?.documents?.length > 0, users);
   check('password hashes never leave the server', !JSON.stringify(users).includes('passwordHash'), 'passwordHash present');
 
-  const codes = await api('GET', '/database/Otp?limit=5', { token: ownerToken });
-  check('code hashes never leave the server', !JSON.stringify(codes).includes('codeHash'), 'codeHash present');
+  check(
+    'lockout bookkeeping never leaves the server',
+    !JSON.stringify(users).includes('failedLoginAttempts') &&
+      !JSON.stringify(users).includes('lockedUntil'),
+    'lockout fields present',
+  );
+
+  const paymentsPage = await api('GET', '/database/Payment?limit=5', { token: ownerToken });
+  check('the payments collection is browsable', paymentsPage.status === 200, paymentsPage);
+  check('gateway signatures never leave the server', !JSON.stringify(paymentsPage).includes('"signature"'), 'signature present');
 
   const escaped = await api('GET', '/database/User?q=.%2A', { token: ownerToken });
   check('a search term is escaped, not run as a pattern', escaped.data?.total === 0, escaped.data?.total);
@@ -288,7 +342,7 @@ async function main() {
       },
       type: 'standard',
       notes: 'Smoke test booking',
-      paymentMethod: 'upi',
+      paymentMethod: 'cash',
       preferredWorkerId: freeWorker._id,
     },
   });
@@ -338,8 +392,8 @@ async function main() {
   const arrived = await api('POST', `/workers/me/jobs/${bookingId}/arrived`, { token: wToken });
   check('worker marks arrived', arrived.data?.status === 'arrived', arrived);
 
-  /* ------------------------------- OTP gate ---------------------------- */
-  section('OTP verification');
+  /* ------------------------------ job codes ---------------------------- */
+  section('Job start and completion codes');
 
   const detail = await api('GET', `/bookings/${bookingId}`, { token: custToken });
   check('customer can read the start code', /^\d{4}$/.test(detail.data?.otp?.start || ''), detail.data?.otp);
@@ -415,7 +469,7 @@ async function main() {
   const overview = await api('GET', '/admin/overview', { token: adminToken });
   check('GET /admin/overview loads', !!overview.data?.workforce, overview);
   check('overview scopes to the admin cooperative', !!overview.data?.cooperative?.name, overview.data?.cooperative);
-  check('overview reports a dividend pool', typeof overview.data?.cooperative?.dividendPool === 'number', overview.data?.cooperative);
+  check('overview reports commission earned', typeof overview.data?.cooperative?.stats?.commissionEarned === 'number', overview.data?.cooperative);
   check('overview reports a fulfilment rate', typeof overview.data?.operations?.fulfilmentRate === 'number', overview.data?.operations);
   check('14-day trend is filled for every day', overview.data?.trend?.length === 14, overview.data?.trend?.length);
 
@@ -446,8 +500,8 @@ async function main() {
   check('settlement preview computes payout lines', settlement.data?.lines?.length > 0, settlement.data?.totals);
   if (settlement.data?.lines?.length) {
     const line = settlement.data.lines[0];
-    check('payout line includes a dividend share', typeof line.dividendShare === 'number', line);
-    check('net equals earnings plus dividend', line.net === line.earnings + line.dividendShare, line);
+    check('payout line reports commission withheld', typeof line.coopCommission === 'number', line);
+    check('net equals the earnings already net of commission', line.net === line.earnings, line);
   }
 
   /* ---------------------------- notifications -------------------------- */

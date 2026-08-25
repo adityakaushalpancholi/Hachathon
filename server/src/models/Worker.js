@@ -78,7 +78,7 @@ const workerSchema = new mongoose.Schema(
       lifetime: { type: Number, default: 0 },
       thisMonth: { type: Number, default: 0 },
       pendingPayout: { type: Number, default: 0 },
-      dividendsReceived: { type: Number, default: 0 },
+      totalPaid: { type: Number, default: 0 },
     },
 
     availability: {

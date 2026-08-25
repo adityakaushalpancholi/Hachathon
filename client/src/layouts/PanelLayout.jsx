@@ -28,6 +28,10 @@ export default function PanelLayout({ nav, panel }) {
   // rehydrated before the API answered.
   const panelTitle = account?.label ?? meta.title;
   const items = nav.filter((item) => !item.ownerOnly || isOwner);
+
+  // The mobile tab bar has room for four; `secondary` entries stand aside for
+  // the ones people actually reach for on a phone.
+  const tabBarItems = items.filter((item) => !item.secondary).slice(0, 4);
   const accentBar = {
     customer: 'bg-navy-900',
     worker: 'bg-coop-600',
@@ -60,10 +64,10 @@ export default function PanelLayout({ nav, panel }) {
     <div className="rounded-lg border border-navy-100 bg-navy-50/60 p-3">
       <div className="flex items-center gap-2 text-navy-500">
         <Building2 size={13} />
-        <span className="text-[10px] font-bold uppercase tracking-wider">Cooperative</span>
+        <span className="text-[10px] font-bold uppercase tracking-wider">Company</span>
       </div>
       <p className="mt-1.5 text-sm font-semibold leading-tight text-navy-900">
-        {cooperative?.name ?? workerProfile?.cooperative?.name ?? 'ShramSetu Network'}
+        {cooperative?.name ?? workerProfile?.cooperative?.name ?? 'ShramSetu'}
       </p>
       {user?.membershipId && (
         <p className="tnum mt-1 font-mono text-[11px] text-navy-400">{user.membershipId}</p>
@@ -198,7 +202,7 @@ export default function PanelLayout({ nav, panel }) {
       {/* ------------------- mobile bottom tab bar ----------------------- */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-navy-100 bg-white/95 backdrop-blur lg:hidden">
         <div className="flex">
-          {items.slice(0, 4).map((item) => (
+          {tabBarItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

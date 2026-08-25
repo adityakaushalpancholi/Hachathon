@@ -19,7 +19,7 @@ const STATUSES = [
 /**
  * The verification queue.
  *
- * This is the cooperative's core governance act — members admitting members —
+ * Admitting someone to the platform is the decision that carries the most risk,
  * so the decision is deliberately not one click: the reviewer opens the file,
  * sees the documents and leaves a note that reaches the applicant.
  */
@@ -59,11 +59,11 @@ export default function Verification() {
     <div className="space-y-6">
       <SectionHeader
         title="Member verification"
-        hint="Members verify members. Your board carries the reputational risk of who gets admitted."
+        hint="Identity and background documents, reviewed by a person before anyone takes a job."
       />
 
       <div className="space-y-3">
-        <ChipRow options={STATUSES} value={status} onChange={setStatus} allLabel="All members" />
+        <ChipRow options={STATUSES} value={status} onChange={setStatus} allLabel="Everyone" />
 
         <div className="relative max-w-sm">
           <Search
@@ -75,7 +75,7 @@ export default function Verification() {
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search by name…"
             className="input pl-10"
-            aria-label="Search members"
+            aria-label="Search professionals"
           />
         </div>
       </div>
@@ -95,7 +95,7 @@ export default function Verification() {
         empty={
           <EmptyState
             icon={ShieldCheck}
-            title={status === 'pending' ? 'Queue is clear' : 'No members match'}
+            title={status === 'pending' ? 'Queue is clear' : 'Nobody matches'}
             hint={
               status === 'pending'
                 ? 'Every application has been reviewed. New sign-ups will appear here.'
@@ -105,7 +105,7 @@ export default function Verification() {
         }
       >
         <>
-          <p className="muted">{data?.meta?.total ?? data?.length ?? 0} members</p>
+          <p className="muted">{data?.meta?.total ?? data?.length ?? 0} professionals</p>
 
           <div className="space-y-3">
             {(data ?? []).map((w) => (

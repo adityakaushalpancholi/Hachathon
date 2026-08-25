@@ -63,14 +63,14 @@ export function AuthProvider({ children }) {
   );
 
   /**
-   * Ask for a code. No session results — this only starts the exchange, and it
-   * deliberately returns the same shape whether or not the number is known.
+   * Change the password, then adopt the session that comes back.
+   *
+   * The server mints a fresh token on success, so replacing the stored one here
+   * keeps the client from holding a session issued before the credential moved.
    */
-  const requestOtp = useCallback((phone) => authApi.requestOtp(phone), []);
-
-  const verifyOtp = useCallback(
+  const changePassword = useCallback(
     async (payload) => {
-      const result = await authApi.verifyOtp(payload);
+      const result = await authApi.changePassword(payload);
       applySession(result);
       return result;
     },
@@ -99,9 +99,9 @@ export function AuthProvider({ children }) {
       role: session?.panel ?? null,
       workerProfile: session?.workerProfile ?? null,
       cooperative: session?.cooperative ?? null,
-      // The server's own description of the account — role, label, which sign-in
-      // methods work, whether the number is verified. The client renders this
-      // rather than deducing any of it from the user document.
+      // The server's own description of the account — role, panel label, owner
+      // flag, when the password last changed. The client renders this rather
+      // than deducing any of it from the user document.
       account: session?.account ?? null,
       isAuthenticated: Boolean(session),
       // Display hint only. The database panel is gated server-side against the
@@ -110,14 +110,13 @@ export function AuthProvider({ children }) {
       isOwner: Boolean(session?.account?.isOwner ?? session?.isOwner),
       loading,
       login,
-      requestOtp,
-      verifyOtp,
+      changePassword,
       register,
       logout,
       refresh,
       setSession,
     }),
-    [session, loading, login, requestOtp, verifyOtp, register, logout, refresh],
+    [session, loading, login, changePassword, register, logout, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

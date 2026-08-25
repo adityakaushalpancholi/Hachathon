@@ -203,7 +203,7 @@ export default function WorkerProfile() {
                 <div className="card-pad">
                   <div className="mb-2.5 flex items-center gap-2 text-navy-500">
                     <Building2 size={15} />
-                    <h3 className="text-xs font-bold uppercase tracking-wide">Cooperative</h3>
+                    <h3 className="text-xs font-bold uppercase tracking-wide">Company</h3>
                   </div>
                   <p className="font-bold tracking-tight text-navy-900">
                     {worker.cooperative.name}
@@ -222,12 +222,6 @@ export default function WorkerProfile() {
                         <dt className="text-navy-500">Rate floor</dt>
                         <dd className="tnum font-semibold text-navy-900">
                           {inr(worker.cooperative.governance.minHourlyRate)}/hr
-                        </dd>
-                      </div>
-                      <div className="flex justify-between">
-                        <dt className="text-navy-500">Returned as dividend</dt>
-                        <dd className="tnum font-semibold text-coop-700">
-                          {pct(worker.cooperative.governance.dividendPoolPct * 100)}
                         </dd>
                       </div>
                     </dl>
@@ -256,7 +250,7 @@ export default function WorkerProfile() {
                   <div className="mb-2.5 flex items-center gap-2 text-navy-500">
                     <GraduationCap size={15} />
                     <h3 className="text-xs font-bold uppercase tracking-wide">
-                      Cooperative training
+                      Training completed
                     </h3>
                   </div>
                   <ul className="space-y-1.5">

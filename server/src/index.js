@@ -6,7 +6,7 @@ import { purgeDemoData } from './seed/purge.js';
 import { User } from './models/index.js';
 import { env, assertProductionConfig } from './config/env.js';
 import { hasOwners } from './services/owner.service.js';
-import { warnIfNoSmsProvider } from './services/sms.service.js';
+import { warnIfNoGateway } from './services/payment.service.js';
 import { logger } from './utils/logger.js';
 
 /**
@@ -51,7 +51,7 @@ async function bootstrap() {
   } else {
     logger.info(`admin authority: ${env.ownerPhones.length} owner number(s) configured`);
   }
-  warnIfNoSmsProvider();
+  warnIfNoGateway();
 
   startScheduler();
 

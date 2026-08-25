@@ -61,6 +61,15 @@ const HOUR_WEIGHTS = [
   1.0, 0.9, 1.0, 1.2, 1.5, 1.9, 2.0, 1.7, 1.1, 0.6, 0.3, 0.15,
 ];
 
+/**
+ * How much fictional history the demo seed writes.
+ *
+ * Every screen that reads it aggregates server-side, so the numbers below buy
+ * chart shape rather than realism. Keep them small: this data exists to make
+ * the product demonstrable, not to load-test it.
+ */
+const SEED_HISTORY_DAYS = 30;
+
 const weightedHour = () => {
   const total = HOUR_WEIGHTS.reduce((a, b) => a + b, 0);
   let r = random() * total;
@@ -134,7 +143,7 @@ export async function runSeed({ quiet = false, demo = false } = {}) {
     const admin = new User({
       name: i === 0 ? 'Anjali Deshpande' : 'Vikram Salvi',
       phone: i === 0 ? '9876500001' : '9876500002',
-      email: i === 0 ? 'anjali@mumbaikaamgaar.coop' : 'vikram@thaneshramik.coop',
+      email: i === 0 ? 'anjali@westlinehome.in' : 'vikram@northgatefacility.in',
       role: 'admin',
       cooperative: coop._id,
       membershipId: membershipId(coop.code, 1),
@@ -261,7 +270,7 @@ export async function runSeed({ quiet = false, demo = false } = {}) {
           lifetime: jobsCompleted * randInt(280, 900),
           thisMonth: randInt(2000, 26000),
           pendingPayout: randInt(0, 9000),
-          dividendsReceived: randInt(0, 7000),
+          totalPaid: randInt(0, 40000),
         },
         availability: {
           isOnline,
@@ -335,15 +344,21 @@ export async function runSeed({ quiet = false, demo = false } = {}) {
   }
   log(`created ${customers.length} customers`);
 
-  /* 6 - 60 days of booking history ---------------------------------------- */
+  /* 6 - booking history ----------------------------------------------------
+   *
+   * Enough history for the charts and the forecast to have a real shape, and no
+   * more. The earlier fixture wrote ~550 bookings over 60 days, which made every
+   * admin screen slow to load and the database tedious to look through for no
+   * gain — the trend lines read exactly the same at a third of the volume.
+   */
   const bookings = [];
 
-  for (let day = 60; day >= 1; day -= 1) {
+  for (let day = SEED_HISTORY_DAYS; day >= 1; day -= 1) {
     const date = new Date(Date.now() - day * 86400_000);
     // Weekends run hotter, and volume trends gently upward over the period.
     const weekendBoost = [0, 6].includes(date.getDay()) ? 1.4 : 1;
-    const growth = 1 + (60 - day) / 140;
-    const count = Math.round(randInt(4, 9) * weekendBoost * growth);
+    const growth = 1 + (SEED_HISTORY_DAYS - day) / 140;
+    const count = Math.round(randInt(2, 4) * weekendBoost * growth);
 
     for (let i = 0; i < count; i += 1) {
       const service = pick(services);
@@ -409,7 +424,7 @@ export async function runSeed({ quiet = false, demo = false } = {}) {
         durationMins: pkg.durationMins,
         pricing,
         payment: {
-          method: pick(['upi', 'upi', 'upi', 'card', 'cash']),
+          method: pick(['razorpay', 'razorpay', 'cash']),
           status: status === BOOKING_STATUS.COMPLETED ? PAYMENT_STATUS.PAID : PAYMENT_STATUS.PENDING,
           txnId: status === BOOKING_STATUS.COMPLETED ? txnRef() : undefined,
           paidAt: status === BOOKING_STATUS.COMPLETED ? completedAt : undefined,
@@ -515,7 +530,6 @@ export async function runSeed({ quiet = false, demo = false } = {}) {
       grossVolume: Math.round(row.gross),
       commissionEarned: Math.round(row.commission),
       // Part of the pool has already gone out to members in past cycles.
-      dividendsDistributed: Math.round(row.commission * coop.governance.dividendPoolPct * 0.45),
       avgRating: rated.length
         ? Number((rated.reduce((s, w) => s + w.rating.average, 0) / rated.length).toFixed(2))
         : 0,
@@ -564,7 +578,7 @@ export async function runSeed({ quiet = false, demo = false } = {}) {
       scheduledFor: new Date(Date.now() + 25 * 60_000),
       durationMins: livePkg.durationMins,
       pricing,
-      payment: { method: 'upi', status: PAYMENT_STATUS.PENDING },
+      payment: { method: 'cash', status: PAYMENT_STATUS.PENDING },
       otp: { start: otpCode(), complete: otpCode() },
       dispatch: {
         round: 1,

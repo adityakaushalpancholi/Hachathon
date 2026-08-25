@@ -39,18 +39,7 @@ export const listCooperatives = asyncHandler(async (req, res) => {
 
   const items = await Cooperative.find(filter).sort({ 'stats.memberCount': -1 }).lean();
 
-  return ok(
-    res,
-    items.map((c) => ({
-      ...c,
-      dividendPool: Math.max(
-        0,
-        Math.round(
-          c.stats.commissionEarned * c.governance.dividendPoolPct - c.stats.dividendsDistributed,
-        ),
-      ),
-    })),
-  );
+  return ok(res, items);
 });
 
 export const getCooperative = asyncHandler(async (req, res) => {

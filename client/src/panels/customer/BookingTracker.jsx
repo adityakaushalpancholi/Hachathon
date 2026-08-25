@@ -13,6 +13,7 @@ import { inr, formatDateTime, formatTime, relativeTime, km } from '../../lib/for
 import { TRACK_STEPS, STATUS_META, isLive, CANCEL_REASONS, REVIEW_TAG_LABELS } from '../../lib/status.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import PriceBreakdown from './PriceBreakdown.jsx';
+import PayButton from '../../components/PayButton.jsx';
 
 export default function BookingTracker() {
   const { id } = useParams();
@@ -76,8 +77,9 @@ export default function BookingTracker() {
               <div className="text-right">
                 <p className="tnum text-2xl font-bold text-navy-900">{inr(booking.pricing.total)}</p>
                 <p className="text-xs text-navy-500">
-                  {booking.payment.status === 'paid' ? 'Paid' : 'Pay after the job'} ·{' '}
-                  {booking.payment.method.toUpperCase()}
+                  {booking.payment.status === 'paid'
+                    ? `Paid · ${booking.payment.method}`
+                    : 'Pay now or on completion'}
                 </p>
               </div>
             </div>
@@ -90,7 +92,7 @@ export default function BookingTracker() {
             <MatchingCard booking={booking} onRetry={() => act(() => bookingApi.retry(id), 'Searching again')} busy={busy} />
           )}
 
-          {/* ---------------------------- the member -------------------------- */}
+          {/* -------------------------- the professional ---------------------- */}
           {booking.worker && (
             <div className="card-pad">
               <SectionHeader title="Your member" />
@@ -128,7 +130,7 @@ export default function BookingTracker() {
           {booking.otp?.start && ['accepted', 'enroute', 'arrived'].includes(booking.status) && (
             <OtpCard
               title="Start code"
-              hint="Read this out to the member when they arrive. Work cannot begin without it."
+              hint="Read this out when they arrive. Work cannot begin without it."
               code={booking.otp.start}
               onCopy={copyOtp}
             />
@@ -152,7 +154,7 @@ export default function BookingTracker() {
                 <div className="min-w-0 flex-1">
                   <p className="font-bold text-coop-900">How did it go?</p>
                   <p className="text-sm text-coop-700">
-                    Your rating feeds directly into how work is shared out across members.
+                    Your rating feeds directly into how work is shared out.
                   </p>
                 </div>
                 <button onClick={() => setReviewOpen(true)} className="btn-coop shrink-0">
@@ -223,11 +225,17 @@ export default function BookingTracker() {
             }}
           />
 
+          {/* Paying up front is optional — cash on completion stays available,
+              which is why this disappears entirely rather than blocking. */}
+          {booking.status !== 'cancelled' && (
+            <PayButton booking={booking} onPaid={() => reload({ silent: true })} />
+          )}
+
           {/* ----------------------------- actions ---------------------------- */}
           {isLive(booking.status) && (
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => act(() => bookingApi.sos(id), 'Alert raised — the board has been notified')}
+                onClick={() => act(() => bookingApi.sos(id), 'Alert raised — an administrator has been notified')}
                 disabled={busy || booking.sos?.raised}
                 className="btn-danger"
               >
@@ -339,7 +347,7 @@ function MatchingCard({ booking, onRetry, busy }) {
    * them is misleading:
    *
    *   queued    — scheduled for later, not offered to anyone yet
-   *   searching — actively out with members right now
+   *   searching — actively out with professionals right now
    *   failed    — offered, and nobody took it
    */
   const roundsRun = booking.dispatch?.round ?? 0;
@@ -355,7 +363,7 @@ function MatchingCard({ booking, onRetry, busy }) {
   const COPY = {
     queued: {
       title: 'Scheduled',
-      body: `We start offering this to members about 30 minutes before your slot, so you get someone who is actually free then.`,
+      body: `We start offering this about 30 minutes before your slot, so you get someone who is actually free then.`,
     },
     searching: {
       title: 'Finding you a member',
@@ -417,7 +425,7 @@ function MatchingCard({ booking, onRetry, busy }) {
                 }`}
               />
               <span className="flex-1 text-navy-600">
-                Member {km(c.distanceKm)} away · ETA {c.etaMins} min
+                {km(c.distanceKm)} away · ETA {c.etaMins} min
               </span>
               <span
                 className={`font-semibold ${
