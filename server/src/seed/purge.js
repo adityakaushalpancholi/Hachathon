@@ -7,6 +7,7 @@ import {
   Payout,
   Payment,
 } from '../models/index.js';
+import { reconcileCompanyStats } from './reconcile.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -71,10 +72,15 @@ export async function purgeDemoData({ force = false, quiet = false } = {}) {
     deleted[label] = (await Model.deleteMany({})).deletedCount ?? 0;
   }
 
+  /* The companies survive, but their cached counters were counting exactly what
+     just went — see reconcile.js, which owns those numbers and recomputes them
+     from the collections themselves. */
+  await reconcileCompanyStats({ quiet });
+
   log(
     `purged demo data — ${Object.entries(deleted)
       .map(([k, n]) => `${n} ${k}`)
-      .join(', ')}`,
+      .join(', ')}; company counters reset`,
   );
 
   return { purged: true, deleted };

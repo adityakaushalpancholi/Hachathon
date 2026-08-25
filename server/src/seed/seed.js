@@ -70,6 +70,38 @@ const HOUR_WEIGHTS = [
  */
 const SEED_HISTORY_DAYS = 30;
 
+/**
+ * Companies seeded under their pre-rename identity, and what they become.
+ *
+ * This is a data migration living next to the fixture it corrects, rather than
+ * a numbered migration folder for a single one-off. It is idempotent: the match
+ * requires the old name to still be present, so a second run finds nothing.
+ */
+const RENAMED_COMPANIES = [
+  {
+    from: { code: 'MKS', name: 'Mumbai Kaamgaar Sahakari Sanstha' },
+    to: {
+      name: 'Westline Home Services',
+      code: 'WHS',
+      registrationNo: 'U74999MH2019PTC044120',
+      about:
+        'Electricians, plumbers, carpenters and cleaners across the western suburbs, all identity-verified and background-checked before their first job.',
+      'contact.email': 'support@westlinehome.in',
+    },
+  },
+  {
+    from: { code: 'TSS', name: 'Thane Shramik Seva Cooperative' },
+    to: {
+      name: 'Northgate Facility Care',
+      code: 'NFC',
+      registrationNo: 'U74999MH2021PTC077310',
+      about:
+        'A multi-trade home-services company operating across Thane, running its own skills academy and an in-house quality audit on every job.',
+      'contact.email': 'care@northgatefacility.in',
+    },
+  },
+];
+
 const weightedHour = () => {
   const total = HOUR_WEIGHTS.reduce((a, b) => a + b, 0);
   let r = random() * total;
@@ -116,11 +148,31 @@ export async function runSeed({ quiet = false, demo = false } = {}) {
     log('cleared existing collections');
   }
 
-  /* 1 - cooperatives ------------------------------------------------------ */
+  /* 0 - reconcile renamed companies ---------------------------------------
+   *
+   * The catalogue seed below only ever inserts what is missing, which is what
+   * makes it safe to run on every boot — but it also means a company seeded
+   * under an old identity keeps that identity forever. A deployment seeded
+   * before the rename would still be showing "Sahakari Sanstha" and a .coop
+   * address on its live site.
+   *
+   * Matched on the old code, and only where the old name is still in place, so
+   * this cannot overwrite a name someone has since edited themselves. Once no
+   * database carries the old codes it does nothing and can be deleted.
+   */
+  for (const { from, to } of RENAMED_COMPANIES) {
+    const result = await Cooperative.updateOne(
+      { code: from.code, name: from.name },
+      { $set: to },
+    );
+    if (result.modifiedCount) log(`renamed ${from.name} → ${to.name}`);
+  }
+
+  /* 1 - companies --------------------------------------------------------- */
   const coops = (await Cooperative.countDocuments())
     ? await Cooperative.find()
     : await Cooperative.create(COOPERATIVES);
-  log(`${coops.length} cooperatives`);
+  log(`${coops.length} companies`);
 
   /* 2 - service catalogue ------------------------------------------------- */
   const services = (await Service.countDocuments())

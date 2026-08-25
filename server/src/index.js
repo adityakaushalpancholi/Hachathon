@@ -3,6 +3,7 @@ import { connectDatabase, disconnectDatabase, isEphemeral } from './config/db.js
 import { startScheduler, stopScheduler } from './services/scheduler.service.js';
 import { runSeed } from './seed/seed.js';
 import { purgeDemoData } from './seed/purge.js';
+import { reconcileCompanyStats } from './seed/reconcile.js';
 import { User } from './models/index.js';
 import { env, assertProductionConfig } from './config/env.js';
 import { hasOwners } from './services/owner.service.js';
@@ -43,6 +44,10 @@ async function bootstrap() {
       logger.warn('PURGE_DEMO ran — unset it now so a real signup never meets it');
     }
   }
+
+  // Last, so it corrects drift left by anything above — including a purge that
+  // ran on an earlier boot and left the counters behind.
+  await reconcileCompanyStats();
 
   if (!hasOwners()) {
     logger.warn(
