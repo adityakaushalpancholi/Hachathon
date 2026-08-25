@@ -29,6 +29,7 @@ const WorkerHome = lazy(() => import('./panels/worker/WorkerHome.jsx'));
 const JobInbox = lazy(() => import('./panels/worker/JobInbox.jsx'));
 const ActiveJob = lazy(() => import('./panels/worker/ActiveJob.jsx'));
 const Earnings = lazy(() => import('./panels/worker/Earnings.jsx'));
+const EditProfile = lazy(() => import('./panels/worker/EditProfile.jsx'));
 
 // Admin panel
 const AdminOverview = lazy(() => import('./panels/admin/AdminOverview.jsx'));
@@ -88,6 +89,7 @@ export default function App() {
           <Route path="inbox" element={<JobInbox />} />
           <Route path="job/:id" element={<ActiveJob />} />
           <Route path="earnings" element={<Earnings />} />
+          <Route path="profile" element={<EditProfile />} />
           <Route path="account" element={<Account />} />
         </Route>
 

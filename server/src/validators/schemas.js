@@ -114,6 +114,32 @@ export const listWorkersQuery = z.object({
   limit: coerceNum(z.number().int().min(1).max(50)).default(12),
 });
 
+/** A HH:MM clock time, as the roster stores it. */
+const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'use a 24-hour HH:MM time');
+
+/**
+ * What a professional may change about themselves.
+ *
+ * Deliberately excludes verification status, ratings, earnings and the company
+ * they belong to. Those are either awarded by other people or derived from
+ * work actually done, and an account that can edit its own badges is not a
+ * verification system.
+ */
+export const workerProfileSchema = z
+  .object({
+    displayName: z.string().min(2).max(80).optional(),
+    bio: z.string().max(600).optional(),
+    languages: z.array(z.enum(LANGUAGES)).min(1).max(6).optional(),
+    skillTags: z.array(z.string().max(60)).min(1).max(12).optional(),
+    hourlyRate: coerceNum(z.number().min(0).max(20000)).optional(),
+    experienceYears: coerceNum(z.number().min(0).max(60)).optional(),
+    acceptsEmergency: z.boolean().optional(),
+    workingDays: z.array(z.number().int().min(0).max(6)).max(7).optional(),
+    shiftStart: clockTime.optional(),
+    shiftEnd: clockTime.optional(),
+  })
+  .refine((v) => Object.keys(v).length > 0, { message: 'Nothing to update' });
+
 export const availabilitySchema = z.object({
   isOnline: z.boolean().optional(),
   acceptsEmergency: z.boolean().optional(),

@@ -70,6 +70,15 @@ export async function findNearbyWorkers({
   requireEmergency = false,
   excludeWorkerIds = [],
   /**
+   * Ignore each professional's own `serviceRadiusKm`.
+   *
+   * Only the diagnostic below sets this. That radius is a hard filter for
+   * matching and must stay one — but it is also the most common reason a search
+   * is empty, and a diagnostic that inherits the filter it is trying to explain
+   * can only ever report "nobody exists".
+   */
+  ignoreServiceRadius = false,
+  /**
    * When the work actually happens. Given a time, candidates are additionally
    * filtered by their own roster and by whether that slot is already taken —
    * neither of which `isOnline` can answer about a job three days out.
@@ -133,7 +142,7 @@ export async function findNearbyWorkers({
     .map((w) => {
       const distanceKm = Math.round((w.distanceMeters / 1000) * 100) / 100;
       // A worker's own service radius is a hard constraint they set themselves.
-      if (distanceKm > (w.serviceRadiusKm ?? radiusKm)) return null;
+      if (!ignoreServiceRadius && distanceKm > (w.serviceRadiusKm ?? radiusKm)) return null;
 
       const { score, breakdown } = scoreWorker(w, distanceKm, radiusKm, medianJobs);
       return {
@@ -148,6 +157,63 @@ export async function findNearbyWorkers({
     .filter(Boolean)
     .sort((a, b) => b.matchScore - a.matchScore)
     .slice(0, limit);
+}
+
+/**
+ * Why a search came back empty.
+ *
+ * An empty list is the one result that tells nobody anything. The customer
+ * concludes the product is broken, the professional sitting 14 km away
+ * concludes there is no work, and neither of them can act. This walks back the
+ * filters one at a time to find the first one that emptied the result, so the
+ * screen can say something true instead of showing nothing.
+ *
+ * Only runs when there were no results, so it costs nothing on the normal path.
+ */
+export async function explainNoMatches({ coordinates, skillTag, radiusKm = env.dispatchRadiusKm }) {
+  // Anyone here at all, online or not, who covers this address?
+  const offlineToo = await findNearbyWorkers({
+    coordinates, skillTag, radiusKm, requireOnline: false, limit: 5,
+  });
+  if (offlineToo.length) {
+    const n = offlineToo.length;
+    return {
+      reason: 'all_offline',
+      message: `${n} professional${n > 1 ? 's cover' : ' covers'} your area but ${n > 1 ? 'none are' : 'is not'} online right now.`,
+      nearestKm: offlineToo[0].distanceKm,
+    };
+  }
+
+  /* Widen a long way *and* ignore their own radius — this is the common case,
+     where somebody is close by but has not set their coverage far enough to
+     reach. Reporting "nobody exists" here would be plainly false. */
+  const wider = await findNearbyWorkers({
+    coordinates, skillTag, radiusKm: 50, requireOnline: false, limit: 5,
+    ignoreServiceRadius: true,
+  });
+  if (wider.length) {
+    return {
+      reason: 'out_of_range',
+      message: `The nearest professional is about ${Math.round(wider[0].distanceKm)} km away, which is outside the area they have said they cover.`,
+      nearestKm: wider[0].distanceKm,
+    };
+  }
+
+  // Drop the trade filter — maybe it is this one skill that nobody offers here.
+  if (skillTag) {
+    const anyTrade = await findNearbyWorkers({
+      coordinates, radiusKm: 50, requireOnline: false, limit: 5, ignoreServiceRadius: true,
+    });
+    if (anyTrade.length) {
+      return {
+        reason: 'no_one_in_trade',
+        message: 'Nobody offering this service works near you yet.',
+        nearestKm: anyTrade[0].distanceKm,
+      };
+    }
+  }
+
+  return { reason: 'no_coverage', message: 'We do not cover your area yet.', nearestKm: null };
 }
 
 /**

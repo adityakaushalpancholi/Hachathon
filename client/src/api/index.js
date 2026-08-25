@@ -91,6 +91,7 @@ export const workerPanel = {
   earnings: () => http.get('/workers/me/earnings'),
   offers: () => http.get('/workers/me/offers'),
   setAvailability: (payload) => http.patch('/workers/me/availability', payload),
+  updateProfile: (payload) => http.patch('/workers/me/profile', payload),
   pingLocation: (location) => http.post('/workers/me/location', { location }),
 
   accept: (id) => http.post(`/workers/me/offers/${id}/accept`),

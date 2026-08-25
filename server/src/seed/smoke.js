@@ -656,6 +656,73 @@ async function main() {
   });
   check('an absurd radius is refused', wideRadius.status === 400, wideRadius);
 
+  section('A professional edits their own profile');
+
+  const edited = await api('PATCH', '/workers/me/profile', {
+    token: wToken,
+    body: {
+      displayName: 'Smoke Edited Name',
+      bio: 'Twelve years on domestic wiring.',
+      languages: ['hi', 'en', 'mr'],
+      hourlyRate: 275,
+      experienceYears: 12,
+      workingDays: [1, 2, 3, 4, 5],
+      shiftStart: '09:00',
+      shiftEnd: '18:00',
+      acceptsEmergency: true,
+    },
+  });
+  check('a professional can edit their profile', edited.status === 200, edited);
+  check('the display name is stored', edited.data?.profile?.displayName === 'Smoke Edited Name', edited.data?.profile?.displayName);
+  check('working days are stored', String(edited.data?.profile?.availability?.workingDays) === '1,2,3,4,5', edited.data?.profile?.availability);
+  check('shift hours are stored', edited.data?.profile?.availability?.shiftStart === '09:00', edited.data?.profile?.availability);
+
+  /* The name is denormalised onto the Worker so search does not populate User;
+     both copies have to move together or the two disagree. */
+  const meAfter = await api('GET', '/auth/me', { token: wToken });
+  check('the account name moves with it', meAfter.data?.user?.name === 'Smoke Edited Name', meAfter.data?.user?.name);
+
+  const floored = await api('PATCH', '/workers/me/profile', {
+    token: wToken,
+    body: { hourlyRate: 1 },
+  });
+  check('a rate below the company floor is raised, not rejected', floored.status === 200 && floored.data?.profile?.hourlyRate > 1, floored.data?.profile?.hourlyRate);
+  check('and the adjustment is explained', Array.isArray(floored.data?.notes) && floored.data.notes.length > 0, floored.data?.notes);
+
+  const badTrade = await api('PATCH', '/workers/me/profile', {
+    token: wToken,
+    body: { skillTags: ['astronaut'] },
+  });
+  check('an unknown trade is refused', badTrade.status === 400, badTrade);
+
+  const noDays = await api('PATCH', '/workers/me/profile', {
+    token: wToken,
+    body: { workingDays: [] },
+  });
+  check('an empty roster is refused', noDays.status === 400, noDays);
+
+  const badClock = await api('PATCH', '/workers/me/profile', {
+    token: wToken,
+    body: { shiftStart: '25:00' },
+  });
+  check('an impossible clock time is refused', badClock.status === 400, badClock);
+
+  check(
+    'a customer cannot edit a professional profile',
+    (await api('PATCH', '/workers/me/profile', { token: custToken, body: { bio: 'x' } })).status === 403,
+  );
+
+  section('Why a search came back empty');
+
+  const nowhere = await api('GET', '/workers/nearby?lat=28.6139&lng=77.2090&radiusKm=10&online=true');
+  check('an uncovered address returns no one', nowhere.data?.length === 0, nowhere.data?.length);
+  check('and is told why', typeof nowhere.meta?.empty?.message === 'string', nowhere.meta);
+  check('with a machine-readable reason', !!nowhere.meta?.empty?.reason, nowhere.meta?.empty);
+
+  const covered = await api('GET', '/workers/nearby?lat=19.0596&lng=72.8296&radiusKm=15');
+  check('a covered address returns people', covered.data?.length > 0, covered.data?.length);
+  check('and carries no explanation', !covered.meta?.empty, covered.meta);
+
   section('Demand insights');
 
   const forecast = await api('GET', `/insights/forecast?skillTag=${service.skillTag}&horizonHours=24`, { token: custToken });

@@ -7,6 +7,7 @@ import {
   listWorkersQuery,
   nearbyQuery,
   availabilitySchema,
+  workerProfileSchema,
   jobCodeSchema,
   cancelSchema,
   declineSchema,
@@ -30,6 +31,7 @@ const workerOnly = [requireAuth, requireRole(ROLES.WORKER), requireWorkerProfile
 router.get('/me/dashboard', workerOnly, ctrl.workerDashboard);
 router.get('/me/earnings', workerOnly, ctrl.earnings);
 router.get('/me/offers', workerOnly, ctrl.listOffers);
+router.patch('/me/profile', workerOnly, validate({ body: workerProfileSchema }), ctrl.updateProfile);
 router.patch('/me/availability', workerOnly, validate({ body: availabilitySchema }), ctrl.setAvailability);
 router.post('/me/location', workerOnly, ctrl.pingLocation);
 

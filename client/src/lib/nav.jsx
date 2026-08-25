@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, CalendarCheck, MapPin, PlusCircle,
   Inbox, Wrench, Wallet,
-  ShieldCheck, Activity, Banknote, TrendingUp, Database, UserCog,
+  ShieldCheck, Activity, Banknote, TrendingUp, Database, UserCog, IdCard,
 } from 'lucide-react';
 
 /**
@@ -29,6 +29,7 @@ export const WORKER_NAV = [
   { to: '/work', end: true, label: 'Today', icon: LayoutDashboard },
   { to: '/work/inbox', label: 'Job offers', icon: Inbox, badgeKey: 'offers' },
   { to: '/work/earnings', label: 'Earnings', icon: Wallet },
+  { to: '/work/profile', label: 'My profile', icon: IdCard },
   { to: '/work/account', label: 'Account', icon: UserCog, secondary: true },
 ];
 

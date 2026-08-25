@@ -39,6 +39,10 @@ export default function Nearby() {
   );
 
   const workers = data ?? [];
+  /* When the list is empty the server says which filter emptied it. Showing
+     nothing at all is the one answer that leaves a customer unable to act —
+     they cannot tell a broken product from an uncovered address. */
+  const emptyReason = data?.meta?.empty;
 
   if (!home) {
     return (
@@ -137,8 +141,21 @@ export default function Nearby() {
             {workers.length === 0 ? (
               <EmptyState
                 icon={Radar}
-                title="Nobody in range"
-                hint="Try a wider radius, or turn off the availability filter."
+                title={
+                  emptyReason?.reason === 'all_offline'
+                    ? 'Everybody nearby is offline'
+                    : emptyReason?.reason === 'out_of_range'
+                      ? 'Nobody covers your address yet'
+                      : emptyReason?.reason === 'no_one_in_trade'
+                        ? 'No one in this trade near you'
+                        : emptyReason
+                          ? 'We do not reach your area yet'
+                          : 'Nobody in range'
+                }
+                hint={
+                  emptyReason?.message ??
+                  'Try a wider radius, or turn off the availability filter.'
+                }
               />
             ) : (
               <div className="max-h-[560px] space-y-2.5 overflow-y-auto pr-1">

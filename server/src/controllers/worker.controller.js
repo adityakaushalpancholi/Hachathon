@@ -1,7 +1,7 @@
-import { Worker, Booking, Review, Service } from '../models/index.js';
+import { Worker, Booking, Review, Service, User, Cooperative } from '../models/index.js';
 import { asyncHandler, ApiError } from '../utils/ApiError.js';
 import { ok, paginated } from '../utils/respond.js';
-import { findNearbyWorkers } from '../services/matching.service.js';
+import { findNearbyWorkers, explainNoMatches } from '../services/matching.service.js';
 import { pendingOffersFor, acceptOffer, declineOffer } from '../services/dispatch.service.js';
 import { workerEarnings } from '../services/payout.service.js';
 import { advanceStatus, startJob, completeJob, cancelBooking } from '../services/booking.service.js';
@@ -72,7 +72,18 @@ export const nearby = asyncHandler(async (req, res) => {
     requireEmergency: emergency ?? false,
   });
 
-  return ok(res, workers, { radiusKm, center: [lng, lat], count: workers.length });
+  /* An empty list is the one answer that explains nothing, so when it happens
+     we work out which filter emptied it and say so. */
+  const explanation = workers.length
+    ? null
+    : await explainNoMatches({ coordinates: [lng, lat], skillTag, radiusKm });
+
+  return ok(res, workers, {
+    radiusKm,
+    center: [lng, lat],
+    count: workers.length,
+    ...(explanation ? { empty: explanation } : {}),
+  });
 });
 
 /* --------------------------- worker panel ---------------------------- */
@@ -132,6 +143,71 @@ export const workerDashboard = asyncHandler(async (req, res) => {
     earnings,
     reviews,
   });
+});
+
+/**
+ * Edit your own profile.
+ *
+ * The hourly rate is floored at the company's agreed minimum rather than
+ * rejected outright — someone entering 150 against a floor of 200 means "as
+ * cheap as I am allowed to be", and refusing the whole save over it teaches
+ * nothing. The stored value is the floor and the response says what happened.
+ *
+ * `displayName` is denormalised onto the Worker so search results do not have
+ * to populate User, so both copies move together or the two disagree.
+ */
+export const updateProfile = asyncHandler(async (req, res) => {
+  const worker = req.workerProfile;
+  const {
+    displayName, bio, languages, skillTags, hourlyRate, experienceYears,
+    acceptsEmergency, workingDays, shiftStart, shiftEnd,
+  } = req.body;
+
+  const notes = [];
+
+  if (displayName !== undefined) {
+    worker.displayName = displayName;
+    await User.updateOne({ _id: worker.user }, { $set: { name: displayName } });
+  }
+  if (bio !== undefined) worker.bio = bio;
+  if (languages !== undefined) worker.languages = languages;
+  if (experienceYears !== undefined) worker.experienceYears = experienceYears;
+  if (acceptsEmergency !== undefined) worker.availability.acceptsEmergency = acceptsEmergency;
+
+  if (workingDays !== undefined) {
+    if (!workingDays.length) throw ApiError.badRequest('Choose at least one working day');
+    worker.availability.workingDays = [...new Set(workingDays)].sort();
+  }
+  if (shiftStart !== undefined) worker.availability.shiftStart = shiftStart;
+  if (shiftEnd !== undefined) worker.availability.shiftEnd = shiftEnd;
+
+  if (hourlyRate !== undefined) {
+    const coop = await Cooperative.findById(worker.cooperative).select('governance');
+    const floor = coop?.governance?.minHourlyRate ?? 0;
+    worker.hourlyRate = Math.max(hourlyRate, floor);
+    if (hourlyRate < floor) notes.push(`Raised to the ${floor} minimum rate for your company.`);
+  }
+
+  if (skillTags !== undefined) {
+    const services = await Service.find({ skillTag: { $in: skillTags } }).select('_id skillTag');
+    const known = new Set(services.map((x) => x.skillTag));
+
+    const unknown = skillTags.filter((t) => !known.has(t));
+    if (unknown.length) throw ApiError.badRequest(`Not a service we offer: ${unknown.join(', ')}`);
+
+    // Keep the years already recorded against a trade someone is re-selecting.
+    const previous = new Map(worker.skills.map((sk) => [sk.skillTag, sk]));
+    worker.skills = skillTags.map((tag) => ({
+      skillTag: tag,
+      service: services.find((x) => x.skillTag === tag)?._id,
+      level: previous.get(tag)?.level ?? 'skilled',
+      yearsExperience: previous.get(tag)?.yearsExperience ?? (experienceYears ?? worker.experienceYears ?? 1),
+    }));
+  }
+
+  await worker.save();
+
+  return ok(res, { profile: worker.toObject(), notes });
 });
 
 export const setAvailability = asyncHandler(async (req, res) => {
